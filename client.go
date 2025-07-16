@@ -91,7 +91,7 @@ func (c *Client) AddSecret(ID string, password string) (string, error) {
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/secrets", c.BaseURL)
+	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
@@ -133,7 +133,7 @@ func (c *Client) UpdateSecret(ID string, password string) (string, error) {
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/secrets", c.BaseURL)
+	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
 	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
@@ -174,7 +174,7 @@ func (c *Client) DeleteSecret(ID string) (string, error) {
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/secrets", c.BaseURL)
+	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
 	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", err
