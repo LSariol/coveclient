@@ -1,6 +1,6 @@
 # CoveClient
 
-A lightweight Go client for securely communicating with [Cove](https://github.com/yourname/cove), your personal secret management service.
+A lightweight Go client for securely communicating with [Cove](https://github.com/LSariol/cove), your personal secret management service.
 
 ## Features
 
