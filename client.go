@@ -1,4 +1,4 @@
-package coveclient
+package CoveClient
 
 import (
 	"encoding/json"

@@ -1,1 +1,1 @@
-package coveclient
+package CoveClient
