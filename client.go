@@ -1,8 +1,10 @@
 package coveclient
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 )
 
@@ -47,7 +49,7 @@ func (c *Client) GetSecret(id string) (string, error) {
 
 }
 
-func (c *Client) GetPublicKeyVault() ([]PublicSecretEntry, error) {
+func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
 
 	var secrets []PublicSecretEntry
 
@@ -75,4 +77,129 @@ func (c *Client) GetPublicKeyVault() ([]PublicSecretEntry, error) {
 
 	return secrets, nil
 
+}
+
+func (c *Client) AddSecret(ID string, password string) (string, error) {
+
+	load := payload{
+		SecretID:    ID,
+		SecretValue: password,
+	}
+
+	jsonData, err := json.Marshal(load)
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s/secrets", c.BaseURL)
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	//Handle Response
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("AddSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	//Read Response
+	var res response
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+
+	return res.Message, nil
+
+}
+
+func (c *Client) UpdateSecret(ID string, password string) (string, error) {
+	load := payload{
+		SecretID:    ID,
+		SecretValue: password,
+	}
+
+	jsonData, err := json.Marshal(load)
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s/secrets", c.BaseURL)
+	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	//Handle Response
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("UpdateSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	//Read Response
+	var res response
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+
+	return res.Message, nil
+}
+
+func (c *Client) DeleteSecret(ID string) (string, error) {
+	load := payload{
+		SecretID:    ID,
+		SecretValue: "",
+	}
+
+	jsonData, err := json.Marshal(load)
+	if err != nil {
+		return "", err
+	}
+
+	url := fmt.Sprintf("%s/secrets", c.BaseURL)
+	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return "", err
+	}
+
+	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	//Handle Response
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("DeleteSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+	}
+
+	//Read Response
+	var res response
+	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
+		return "", err
+	}
+
+	return res.Message, nil
 }

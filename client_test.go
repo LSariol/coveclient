@@ -4,81 +4,111 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-// Dummy secret struct for testing
-var testSecrets = []PublicSecretEntry{
-	{Key: "db-password", DateAdded: "2025-07-01", LastModified: "2025-07-02"},
-	{Key: "api-token", DateAdded: "2025-07-03", LastModified: "2025-07-04"},
+// Dummy data and helpers
+var testSecret = "supersecret"
+var testMessage = "Operation successful"
+var testID = "api-key"
+var testEntries = []PublicSecretEntry{
+	{Key: "api-key", DateAdded: "2025-07-01", LastModified: "2025-07-02"},
+	{Key: "db-token", DateAdded: "2025-07-03", LastModified: "2025-07-04"},
 }
 
-// Dummy secret value response
-var testSecretValue = struct {
-	Value string `json:"value"`
-}{
-	Value: "s3cr3t!",
+func newTestServer(t *testing.T) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		if auth != "Bearer test-secret" {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		switch {
+		case r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/secrets/"):
+			json.NewEncoder(w).Encode(SecretValue{Secret: testSecret})
+		case r.Method == http.MethodGet && r.URL.Path == "/secrets":
+			json.NewEncoder(w).Encode(testEntries)
+		case r.Method == http.MethodPost && r.URL.Path == "/secrets":
+			json.NewEncoder(w).Encode(response{Message: testMessage})
+		case r.Method == http.MethodPatch && r.URL.Path == "/secrets":
+			json.NewEncoder(w).Encode(response{Message: testMessage})
+		case r.Method == http.MethodDelete && r.URL.Path == "/secrets":
+			json.NewEncoder(w).Encode(response{Message: testMessage})
+		default:
+			t.Errorf("Unexpected request: %s %s", r.Method, r.URL.Path)
+			http.Error(w, "Not found", http.StatusNotFound)
+		}
+	}))
 }
 
 func TestGetSecret(t *testing.T) {
-	// Create a fake server to simulate Cove
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth != "Bearer correct-token" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
+	ts := newTestServer(t)
+	defer ts.Close()
 
-		if r.URL.Path == "/secrets/db-password" {
-			json.NewEncoder(w).Encode(testSecretValue)
-			return
-		}
-
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	client := New(server.URL, "correct-token")
-
-	secret, err := client.GetSecret("db-password")
+	client := New(ts.URL, "test-secret")
+	secret, err := client.GetSecret("api-key")
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("GetSecret failed: %v", err)
 	}
-
-	if secret != testSecretValue.Value {
-		t.Errorf("expected %s, got %s", testSecretValue.Value, secret)
+	if secret != testSecret {
+		t.Errorf("expected %q, got %q", testSecret, secret)
 	}
 }
 
-func TestGetPublicKeyVault(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		auth := r.Header.Get("Authorization")
-		if auth != "Bearer correct-token" {
-			http.Error(w, "unauthorized", http.StatusUnauthorized)
-			return
-		}
+func TestGetAllSecrets(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
 
-		if r.URL.Path == "/secrets" {
-			json.NewEncoder(w).Encode(testSecrets)
-			return
-		}
-
-		http.NotFound(w, r)
-	}))
-	defer server.Close()
-
-	client := New(server.URL, "correct-token")
-
-	secrets, err := client.GetPublicKeyVault()
+	client := New(ts.URL, "test-secret")
+	secrets, err := client.GetAllSecrets()
 	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
+		t.Fatalf("GetAllSecrets failed: %v", err)
 	}
-
-	if len(secrets) != 2 {
-		t.Errorf("expected 2 secrets, got %d", len(secrets))
+	if len(secrets) != len(testEntries) {
+		t.Errorf("expected %d entries, got %d", len(testEntries), len(secrets))
 	}
+}
 
-	if secrets[0].Key != "db-password" {
-		t.Errorf("expected first secret to be 'db-password', got '%s'", secrets[0].Key)
+func TestAddSecret(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+
+	client := New(ts.URL, "test-secret")
+	msg, err := client.AddSecret("new-key", "value123")
+	if err != nil {
+		t.Fatalf("AddSecret failed: %v", err)
+	}
+	if msg != testMessage {
+		t.Errorf("expected message %q, got %q", testMessage, msg)
+	}
+}
+
+func TestUpdateSecret(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+
+	client := New(ts.URL, "test-secret")
+	msg, err := client.UpdateSecret("api-key", "updated123")
+	if err != nil {
+		t.Fatalf("UpdateSecret failed: %v", err)
+	}
+	if msg != testMessage {
+		t.Errorf("expected message %q, got %q", testMessage, msg)
+	}
+}
+
+func TestDeleteSecret(t *testing.T) {
+	ts := newTestServer(t)
+	defer ts.Close()
+
+	client := New(ts.URL, "test-secret")
+	msg, err := client.DeleteSecret("api-key")
+	if err != nil {
+		t.Fatalf("DeleteSecret failed: %v", err)
+	}
+	if msg != testMessage {
+		t.Errorf("expected message %q, got %q", testMessage, msg)
 	}
 }
