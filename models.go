@@ -10,6 +10,7 @@ type PublicSecretEntry struct {
 	Key          string `json:"key"`
 	DateAdded    string `json:"dateAdded"`
 	LastModified string `json:"lastModified"`
+	Version      string `json:"version"`
 }
 
 // Used for sending Create, Delete, Update requests
