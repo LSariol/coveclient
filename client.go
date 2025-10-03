@@ -14,6 +14,7 @@ type Client struct {
 }
 
 func New(baseURL, ClientSecret string) *Client {
+
 	return &Client{
 		BaseURL:      baseURL,
 		ClientSecret: ClientSecret,
@@ -202,4 +203,30 @@ func (c *Client) DeleteSecret(ID string) (string, error) {
 	}
 
 	return res.Message, nil
+}
+
+func (c *Client) Bootstrap() (string, error) {
+
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/bootstrap/lighthouse", c.BaseURL), nil)
+	if err != nil {
+		return "", err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("boostrap: bad status %d", resp.StatusCode)
+	}
+
+	var result SecretValue
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", err
+	}
+
+	return result.Secret, nil
+
 }
