@@ -123,7 +123,7 @@ func (c *Client) AddSecret(ID string, password string) (string, error) {
 
 }
 
-func (c *Client) UpdateSecret(ID string, password string) (string, error) {
+func (c *Client) UpdateSecret(ID string, password string) error {
 	load := payload{
 		SecretID:    ID,
 		SecretValue: password,
@@ -131,13 +131,13 @@ func (c *Client) UpdateSecret(ID string, password string) (string, error) {
 
 	jsonData, err := json.Marshal(load)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
 	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
@@ -145,26 +145,20 @@ func (c *Client) UpdateSecret(ID string, password string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer resp.Body.Close()
 
 	//Handle Response
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNoContent {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("UpdateSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("UpdateSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	//Read Response
-	var res response
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return "", err
-	}
-
-	return res.Message, nil
+	return nil
 }
 
-func (c *Client) DeleteSecret(ID string) (string, error) {
+func (c *Client) DeleteSecret(ID string) error {
 	load := payload{
 		SecretID:    ID,
 		SecretValue: "",
@@ -172,13 +166,13 @@ func (c *Client) DeleteSecret(ID string) (string, error) {
 
 	jsonData, err := json.Marshal(load)
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
 	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(jsonData))
 	if err != nil {
-		return "", err
+		return err
 	}
 
 	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
@@ -186,23 +180,17 @@ func (c *Client) DeleteSecret(ID string) (string, error) {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer resp.Body.Close()
 
 	//Handle Response
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusNoContent {
 		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("DeleteSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("DeleteSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
 	}
 
-	//Read Response
-	var res response
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return "", err
-	}
-
-	return res.Message, nil
+	return nil
 }
 
 func (c *Client) Bootstrap() (string, error) {
