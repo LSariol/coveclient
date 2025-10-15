@@ -22,7 +22,7 @@ func New(baseURL, ClientSecret string) *Client {
 }
 
 func (c *Client) GetSecret(id string) (string, error) {
-	var result SecretValue
+	var result Payload
 
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s/secrets/%s", c.BaseURL, id), nil)
 	if err != nil {
@@ -46,7 +46,7 @@ func (c *Client) GetSecret(id string) (string, error) {
 		return "", err
 	}
 
-	return result.Secret, nil
+	return result.SecretValue, nil
 
 }
 
@@ -82,7 +82,7 @@ func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
 
 func (c *Client) AddSecret(ID string, password string) (string, error) {
 
-	load := payload{
+	load := Payload{
 		SecretID:    ID,
 		SecretValue: password,
 	}
@@ -114,7 +114,7 @@ func (c *Client) AddSecret(ID string, password string) (string, error) {
 	}
 
 	//Read Response
-	var res response
+	var res Response
 	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
 		return "", err
 	}
@@ -124,7 +124,7 @@ func (c *Client) AddSecret(ID string, password string) (string, error) {
 }
 
 func (c *Client) UpdateSecret(ID string, password string) error {
-	load := payload{
+	load := Payload{
 		SecretID:    ID,
 		SecretValue: password,
 	}
@@ -159,7 +159,7 @@ func (c *Client) UpdateSecret(ID string, password string) error {
 }
 
 func (c *Client) DeleteSecret(ID string) error {
-	load := payload{
+	load := Payload{
 		SecretID:    ID,
 		SecretValue: "",
 	}

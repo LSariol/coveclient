@@ -17,12 +17,12 @@ type PublicSecretEntry struct {
 }
 
 // Used for sending Create, Delete, Update requests
-type payload struct {
+type Payload struct {
 	SecretID    string `json:"secretID"`
 	SecretValue string `json:"secretValue"`
 }
 
 // Response from Create, Delete and Update requests
-type response struct {
+type Response struct {
 	Message string `json:"message"`
 }
