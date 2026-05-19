@@ -1,28 +1,33 @@
 package coveclient
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
-//Return type of getSecret
+type PublicSecretEntry struct {
+	Key          string    `json:"key"`
+	Version      int       `json:"version"`
+	TimesPulled  int       `json:"times_pulled"`
+	DateAdded    time.Time `json:"created_at"`
+	LastModified time.Time `json:"updated_at"`
+}
+
 type SecretValue struct {
 	Secret string `json:"secret"`
 }
 
-// Return type of GetPublicKeyVault
-type PublicSecretEntry struct {
-	Key          string    `json:"key"`
-	Version      int       `json:"version"`
-	TimesPulled  int       `json:"timespulled"`
-	DateAdded    time.Time `json:"dateAdded"`
-	LastModified time.Time `json:"lastModified"`
+type secretPayload struct {
+	Value string `json:"value"`
 }
 
-// Used for sending Create, Delete, Update requests
-type Payload struct {
-	SecretID    string `json:"secretID"`
-	SecretValue string `json:"secretValue"`
+type apiResponse struct {
+	Success bool            `json:"success"`
+	Data    json.RawMessage `json:"data"`
+	Error   *apiError       `json:"error"`
 }
 
-// Response from Create, Delete and Update requests
-type Response struct {
+type apiError struct {
+	Type    string `json:"type"`
 	Message string `json:"message"`
 }

@@ -4,102 +4,109 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
+	"strings"
 )
 
 type Client struct {
 	BaseURL      string
 	ClientSecret string
+	Platform     string
 }
 
-func New(baseURL, ClientSecret string) *Client {
-
+func New(baseURL string, clientSecret string, platformName string) *Client {
 	return &Client{
 		BaseURL:      baseURL,
-		ClientSecret: ClientSecret,
+		ClientSecret: clientSecret,
+		Platform:     strings.ToLower(platformName),
 	}
+}
+
+func decodeEnvelope(resp *http.Response, out interface{}) error {
+	var env apiResponse
+	if err := json.NewDecoder(resp.Body).Decode(&env); err != nil {
+		return err
+	}
+	if !env.Success {
+		if env.Error != nil {
+			return fmt.Errorf("coveClient: %s: %s", env.Error.Type, env.Error.Message)
+		}
+		return fmt.Errorf("coveClient: request failed (status %d)", resp.StatusCode)
+	}
+	if out != nil {
+		return json.Unmarshal(env.Data, out)
+	}
+	return nil
 }
 
 func (c *Client) GetSecret(id string) (string, error) {
-	var result Payload
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/secrets/%s", c.BaseURL, id), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/v0/secrets/%s", c.BaseURL, id), nil)
 	if err != nil {
 		return "", err
 	}
-
 	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+	req.Header.Set("X-Cove-Source", c.Platform)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return "", err
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("coveClient: Unexpected Status %d", resp.StatusCode)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var data struct {
+		Key     string `json:"key"`
+		Value   string `json:"value"`
+		Version int    `json:"version"`
+	}
+	if err := decodeEnvelope(resp, &data); err != nil {
 		return "", err
 	}
-
-	return result.SecretValue, nil
-
+	return data.Value, nil
 }
 
 func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
-
-	var secrets []PublicSecretEntry
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/secrets", c.BaseURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/v0/secrets", c.BaseURL), nil)
 	if err != nil {
-		return secrets, err
+		return nil, err
 	}
-
 	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return secrets, err
+		return nil, err
 	}
-
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return secrets, fmt.Errorf("coveClient: Unexpected Status %d", resp.StatusCode)
+		return nil, fmt.Errorf("coveClient: Unexpected Status %d", resp.StatusCode)
 	}
 
-	if err := json.NewDecoder(resp.Body).Decode(&secrets); err != nil {
-		return secrets, err
+	var data struct {
+		Secrets []PublicSecretEntry `json:"secrets"`
 	}
-
-	return secrets, nil
-
+	if err := decodeEnvelope(resp, &data); err != nil {
+		return nil, err
+	}
+	return data.Secrets, nil
 }
 
-func (c *Client) AddSecret(ID string, password string) (string, error) {
-
-	load := Payload{
-		SecretID:    ID,
-		SecretValue: password,
-	}
-
-	jsonData, err := json.Marshal(load)
+func (c *Client) AddSecret(id string, value string) (string, error) {
+	body, err := json.Marshal(secretPayload{Value: value})
 	if err != nil {
 		return "", err
 	}
 
-	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequest("POST", fmt.Sprintf("%s/v0/secrets/%s", c.BaseURL, id), bytes.NewBuffer(body))
 	if err != nil {
 		return "", err
 	}
-
 	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Cove-Source", c.Platform)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -107,41 +114,55 @@ func (c *Client) AddSecret(ID string, password string) (string, error) {
 	}
 	defer resp.Body.Close()
 
-	//Handle Response
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("coveClient: AddSecret: Unexpected Status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Key     string `json:"key"`
+		Action  string `json:"action"`
+		Message string `json:"message"`
+	}
+	if err := decodeEnvelope(resp, &data); err != nil {
+		return "", err
+	}
+	return data.Message, nil
+}
+
+func (c *Client) UpdateSecret(id string, value string) error {
+	body, err := json.Marshal(secretPayload{Value: value})
+	if err != nil {
+		return err
+	}
+
+	req, err := http.NewRequest("PATCH", fmt.Sprintf("%s/v0/secrets/%s", c.BaseURL, id), bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Cove-Source", c.Platform)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("AddSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+		return fmt.Errorf("coveClient: UpdateSecret: Unexpected Status %d", resp.StatusCode)
 	}
 
-	//Read Response
-	var res Response
-	if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-		return "", err
-	}
-
-	return res.Message, nil
-
+	return decodeEnvelope(resp, nil)
 }
 
-func (c *Client) UpdateSecret(ID string, password string) error {
-	load := Payload{
-		SecretID:    ID,
-		SecretValue: password,
-	}
-
-	jsonData, err := json.Marshal(load)
+func (c *Client) DeleteSecret(id string) error {
+	req, err := http.NewRequest("DELETE", fmt.Sprintf("%s/v0/secrets/%s", c.BaseURL, id), nil)
 	if err != nil {
 		return err
 	}
-
-	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
-	req, err := http.NewRequest("PATCH", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-
 	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
-	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Cove-Source", c.Platform)
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
@@ -149,53 +170,15 @@ func (c *Client) UpdateSecret(ID string, password string) error {
 	}
 	defer resp.Body.Close()
 
-	//Handle Response
-	if resp.StatusCode != http.StatusNoContent {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("UpdateSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("coveClient: DeleteSecret: Unexpected Status %d", resp.StatusCode)
 	}
 
-	return nil
-}
-
-func (c *Client) DeleteSecret(ID string) error {
-	load := Payload{
-		SecretID:    ID,
-		SecretValue: "",
-	}
-
-	jsonData, err := json.Marshal(load)
-	if err != nil {
-		return err
-	}
-
-	url := fmt.Sprintf("%s/secrets/%s", c.BaseURL, ID)
-	req, err := http.NewRequest("DELETE", url, bytes.NewBuffer(jsonData))
-	if err != nil {
-		return err
-	}
-
-	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	//Handle Response
-	if resp.StatusCode != http.StatusNoContent {
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("DeleteSecret: status %d - %s", resp.StatusCode, string(bodyBytes))
-	}
-
-	return nil
+	return decodeEnvelope(resp, nil)
 }
 
 func (c *Client) Bootstrap() (string, error) {
-
-	req, err := http.NewRequest("GET", fmt.Sprintf("%s/bootstrap/lighthouse", c.BaseURL), nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/v0/bootstrap/lighthouse", c.BaseURL), nil)
 	if err != nil {
 		return "", err
 	}
@@ -207,14 +190,58 @@ func (c *Client) Bootstrap() (string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("boostrap: bad status %d", resp.StatusCode)
+		return "", fmt.Errorf("coveClient: Bootstrap: Unexpected Status %d", resp.StatusCode)
 	}
 
-	var result SecretValue
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	var data SecretValue
+	if err := decodeEnvelope(resp, &data); err != nil {
 		return "", err
 	}
+	return data.Secret, nil
+}
 
-	return result.Secret, nil
+func (c *Client) Health() (bool, error) {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/v0/health", c.BaseURL), nil)
+	if err != nil {
+		return false, err
+	}
 
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("coveClient: Health: Unexpected Status %d", resp.StatusCode)
+	}
+
+	var data struct {
+		Healthy bool   `json:"healthy"`
+		Time    string `json:"time"`
+	}
+	if err := decodeEnvelope(resp, &data); err != nil {
+		return false, err
+	}
+	return data.Healthy, nil
+}
+
+func (c *Client) Auth() error {
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s/v0/auth", c.BaseURL), nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("coveClient: Auth: Unexpected Status %d", resp.StatusCode)
+	}
+
+	return decodeEnvelope(resp, nil)
 }

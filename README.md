@@ -1,19 +1,112 @@
 # CoveClient
 
-A lightweight Go client for securely communicating with [Cove](https://github.com/LSariol/cove), your personal secret management service.
+A lightweight, dependency-free Go client for [Cove](https://github.com/LSariol/cove) — a self-hosted secret management service.
 
 ## Features
 
-- Authenticates using a client secret
-- Supports retrieving, creating, updating, and deleting secrets
-- Handles JSON requests to the Cove API
-- Minimal and dependency-free
+- Full CRUD operations on secrets
+- Health check and authentication verification
+- One-call bootstrap for automated first-boot setup
+- Sends `X-Cove-Source` for per-request audit logging
+- Zero external dependencies
 
+## Installation
 
+```bash
+go get github.com/lsariol/coveclient
+```
 
+## Usage
 
+```go
+import "github.com/lsariol/coveclient"
 
+c := coveclient.New("http://cove.internal:2100", "<COVE_CLIENT_SECRET>", "my-app")
+```
 
-# To Do 
-Add CLI integration
-Add Health and Auth functions
+The third argument (`platformName`) is sent as the `X-Cove-Source` header on every secret operation and is recorded in Cove's event log.
+
+---
+
+## Methods
+
+### `Health() (bool, error)`
+Unauthenticated. Returns `true` if the server is reachable and healthy.
+
+```go
+healthy, err := c.Health()
+```
+
+### `Auth() error`
+Authenticated. Returns `nil` if the client secret is valid.
+
+```go
+err := c.Auth()
+```
+
+### `Bootstrap() (string, error)`
+Unauthenticated. Returns the `COVE_CLIENT_SECRET` on first call. Subsequent calls return an error until the marker is cleared via the Cove CLI (`bootstrap clear`).
+
+```go
+secret, err := c.Bootstrap()
+```
+
+### `GetSecret(id string) (string, error)`
+Returns the decrypted value of a secret by key.
+
+```go
+value, err := c.GetSecret("my-api-key")
+```
+
+### `GetAllSecrets() ([]PublicSecretEntry, error)`
+Returns metadata for all secrets. Values are never included.
+
+```go
+entries, err := c.GetAllSecrets()
+for _, e := range entries {
+    fmt.Println(e.Key, e.Version, e.TimesPulled)
+}
+```
+
+### `AddSecret(id, value string) (string, error)`
+Creates a new secret. Returns the server's confirmation message.
+
+```go
+msg, err := c.AddSecret("my-api-key", "super-secret-value")
+```
+
+### `UpdateSecret(id, value string) error`
+Updates an existing secret's value. Increments its version on the server.
+
+```go
+err := c.UpdateSecret("my-api-key", "new-value")
+```
+
+### `DeleteSecret(id string) error`
+Deletes a secret permanently.
+
+```go
+err := c.DeleteSecret("my-api-key")
+```
+
+---
+
+## Types
+
+```go
+type PublicSecretEntry struct {
+    Key          string
+    Version      int
+    TimesPulled  int
+    DateAdded    time.Time
+    LastModified time.Time
+}
+```
+
+---
+
+## Notes
+
+- All routes target the Cove `/v0/` API. If Cove upgrades to `/v1/`, update to a matching version of this module.
+- `http.DefaultClient` is used with no timeout. Set `http.DefaultClient.Timeout` or use a reverse proxy with timeouts if needed.
+- The `Bootstrap` endpoint is one-use only by design. See the [Cove docs](https://github.com/LSariol/cove) for the bootstrap flow.

@@ -11,22 +11,25 @@ import (
 	"time"
 )
 
-// helper to create a client pointing at a test server
 func newTestClient(ts *httptest.Server, secret string) *Client {
-	return New(ts.URL, secret)
+	return New(ts.URL, secret, "test")
 }
 
-// roundTripperFunc allows mocking http.DefaultClient.Do errors
 type roundTripperFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
+func envelope(data interface{}) string {
+	b, _ := json.Marshal(map[string]interface{}{"success": true, "data": data})
+	return string(b)
+}
+
 func TestNewClient(t *testing.T) {
-	c := New("http://example", "tok")
+	c := New("http://example", "tok", "myapp")
 	if c == nil {
 		t.Fatalf("New returned nil")
 	}
-	if c.BaseURL != "http://example" || c.ClientSecret != "tok" {
+	if c.BaseURL != "http://example" || c.ClientSecret != "tok" || c.Platform != "myapp" {
 		t.Fatalf("unexpected client fields: %+v", c)
 	}
 }
@@ -39,14 +42,17 @@ func TestGetSecret_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s, want GET", r.Method)
 		}
-		if r.URL.Path != "/secrets/"+wantID {
-			t.Fatalf("path = %s, want /secrets/%s", r.URL.Path, wantID)
+		if r.URL.Path != "/v0/secrets/"+wantID {
+			t.Fatalf("path = %s, want /v0/secrets/%s", r.URL.Path, wantID)
 		}
 		if got := r.Header.Get("Authorization"); got != wantAuth {
 			t.Fatalf("Authorization = %q, want %q", got, wantAuth)
 		}
+		if got := r.Header.Get("X-Cove-Source"); got != "test" {
+			t.Fatalf("X-Cove-Source = %q, want %q", got, "test")
+		}
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"secretID":"alpha","secretValue":"shh"}`)
+		io.WriteString(w, envelope(map[string]interface{}{"key": "alpha", "value": "shh", "version": 1}))
 	}))
 	defer ts.Close()
 
@@ -63,7 +69,6 @@ func TestGetSecret_Success(t *testing.T) {
 func TestGetSecret_Non200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "oops")
 	}))
 	defer ts.Close()
 
@@ -80,7 +85,7 @@ func TestGetSecret_Non200(t *testing.T) {
 func TestGetSecret_BadJSON(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		io.WriteString(w, `{"secret":`) // malformed
+		io.WriteString(w, `{"success":`) // malformed
 	}))
 	defer ts.Close()
 
@@ -92,7 +97,7 @@ func TestGetSecret_BadJSON(t *testing.T) {
 }
 
 func TestGetSecret_RequestBuildError(t *testing.T) {
-	c := &Client{BaseURL: "http://%", ClientSecret: "tok"}
+	c := &Client{BaseURL: "http://%", ClientSecret: "tok", Platform: "test"}
 	_, err := c.GetSecret("id")
 	if err == nil {
 		t.Fatalf("expected request build error")
@@ -103,13 +108,13 @@ func TestGetAllSecrets_Success(t *testing.T) {
 	t1 := time.Now().UTC().Truncate(time.Second)
 	t2 := t1.Add(10 * time.Minute)
 
-	entries := []PublicSecretEntry{
+	entries := []map[string]interface{}{
 		{
-			Key:          "k1",
-			Version:      1,
-			TimesPulled:  3,
-			DateAdded:    t1,
-			LastModified: t2,
+			"key":         "k1",
+			"version":     1,
+			"times_pulled": 3,
+			"created_at":  t1.Format(time.RFC3339),
+			"updated_at":  t2.Format(time.RFC3339),
 		},
 	}
 
@@ -117,16 +122,14 @@ func TestGetAllSecrets_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s, want GET", r.Method)
 		}
-		if r.URL.Path != "/secrets" {
-			t.Fatalf("path = %s, want /secrets", r.URL.Path)
+		if r.URL.Path != "/v0/secrets" {
+			t.Fatalf("path = %s, want /v0/secrets", r.URL.Path)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
-			t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
+			t.Fatalf("Authorization = %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(entries); err != nil {
-			t.Fatalf("encode: %v", err)
-		}
+		io.WriteString(w, envelope(map[string]interface{}{"secrets": entries}))
 	}))
 	defer ts.Close()
 
@@ -142,14 +145,13 @@ func TestGetAllSecrets_Success(t *testing.T) {
 		t.Fatalf("unexpected entry: %+v", got[0])
 	}
 	if !got[0].DateAdded.Equal(t1) || !got[0].LastModified.Equal(t2) {
-		t.Fatalf("unexpected times: %+v", got[0])
+		t.Fatalf("unexpected times: DateAdded=%v LastModified=%v", got[0].DateAdded, got[0].LastModified)
 	}
 }
 
 func TestGetAllSecrets_Non200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusForbidden)
-		io.WriteString(w, "forbidden")
 	}))
 	defer ts.Close()
 
@@ -175,29 +177,32 @@ func TestGetAllSecrets_BadJSON(t *testing.T) {
 
 func TestAddSecret_Success(t *testing.T) {
 	wantID := "alpha"
-	wantPayload := Payload{SecretID: wantID, SecretValue: "p@ss"}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
 			t.Fatalf("method = %s, want POST", r.Method)
 		}
-		if r.URL.Path != "/secrets/"+wantID {
-			t.Fatalf("path = %s, want /secrets/%s", r.URL.Path, wantID)
+		if r.URL.Path != "/v0/secrets/"+wantID {
+			t.Fatalf("path = %s, want /v0/secrets/%s", r.URL.Path, wantID)
 		}
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-			t.Fatalf("Content-Type = %q, want application/json", ct)
+			t.Fatalf("Content-Type = %q", ct)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
-			t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
+			t.Fatalf("Authorization = %q", got)
 		}
-		var p Payload
+		if got := r.Header.Get("X-Cove-Source"); got != "test" {
+			t.Fatalf("X-Cove-Source = %q, want test", got)
+		}
+		var p secretPayload
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 			t.Fatalf("decode payload: %v", err)
 		}
-		if p != wantPayload {
-			t.Fatalf("payload = %+v, want %+v", p, wantPayload)
+		if p.Value != "p@ss" {
+			t.Fatalf("payload.Value = %q, want p@ss", p.Value)
 		}
-		json.NewEncoder(w).Encode(Response{Message: "ok"})
+		w.WriteHeader(http.StatusCreated)
+		io.WriteString(w, envelope(map[string]interface{}{"key": wantID, "action": "created", "message": "ok"}))
 	}))
 	defer ts.Close()
 
@@ -211,23 +216,23 @@ func TestAddSecret_Success(t *testing.T) {
 	}
 }
 
-func TestAddSecret_Non200(t *testing.T) {
+func TestAddSecret_Non201(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "bad request")
 	}))
 	defer ts.Close()
 
 	c := newTestClient(ts, "tok")
 	_, err := c.AddSecret("id", "pw")
-	if err == nil || !strings.Contains(err.Error(), "AddSecret: status 400 - bad request") {
+	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 400") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestAddSecret_BadJSONResponse(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `{"message":`)
+		w.WriteHeader(http.StatusCreated)
+		io.WriteString(w, `{"success":`)
 	}))
 	defer ts.Close()
 
@@ -240,26 +245,29 @@ func TestAddSecret_BadJSONResponse(t *testing.T) {
 
 func TestUpdateSecret_Success(t *testing.T) {
 	wantID := "beta"
-	wantPayload := Payload{SecretID: wantID, SecretValue: "new"}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPatch {
 			t.Fatalf("method = %s, want PATCH", r.Method)
 		}
-		if r.URL.Path != "/secrets/"+wantID {
-			t.Fatalf("path = %s, want /secrets/%s", r.URL.Path, wantID)
+		if r.URL.Path != "/v0/secrets/"+wantID {
+			t.Fatalf("path = %s, want /v0/secrets/%s", r.URL.Path, wantID)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
-			t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
+			t.Fatalf("Authorization = %q", got)
 		}
-		var p Payload
+		if got := r.Header.Get("X-Cove-Source"); got != "test" {
+			t.Fatalf("X-Cove-Source = %q, want test", got)
+		}
+		var p secretPayload
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 			t.Fatalf("decode payload: %v", err)
 		}
-		if p != wantPayload {
-			t.Fatalf("payload = %+v, want %+v", p, wantPayload)
+		if p.Value != "new" {
+			t.Fatalf("payload.Value = %q, want new", p.Value)
 		}
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, envelope(map[string]interface{}{"key": wantID, "action": "updated", "message": "updated"}))
 	}))
 	defer ts.Close()
 
@@ -269,45 +277,37 @@ func TestUpdateSecret_Success(t *testing.T) {
 	}
 }
 
-func TestUpdateSecret_Non204(t *testing.T) {
+func TestUpdateSecret_Non200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		io.WriteString(w, "nope")
 	}))
 	defer ts.Close()
 
 	c := newTestClient(ts, "tok")
 	err := c.UpdateSecret("id", "pw")
-	if err == nil || !strings.Contains(err.Error(), "UpdateSecret: status 400 - nope") {
+	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 400") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestDeleteSecret_Success(t *testing.T) {
 	wantID := "gamma"
-	wantPayload := Payload{SecretID: wantID, SecretValue: ""}
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodDelete {
 			t.Fatalf("method = %s, want DELETE", r.Method)
 		}
-		if r.URL.Path != "/secrets/"+wantID {
-			t.Fatalf("path = %s, want /secrets/%s", r.URL.Path, wantID)
+		if r.URL.Path != "/v0/secrets/"+wantID {
+			t.Fatalf("path = %s, want /v0/secrets/%s", r.URL.Path, wantID)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
-			t.Fatalf("Authorization = %q, want %q", got, "Bearer tok")
+			t.Fatalf("Authorization = %q", got)
 		}
-		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
-			t.Fatalf("Content-Type = %q, want application/json", ct)
+		if got := r.Header.Get("X-Cove-Source"); got != "test" {
+			t.Fatalf("X-Cove-Source = %q, want test", got)
 		}
-		var p Payload
-		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-			t.Fatalf("decode payload: %v", err)
-		}
-		if p != wantPayload {
-			t.Fatalf("payload = %+v, want %+v", p, wantPayload)
-		}
-		w.WriteHeader(http.StatusNoContent)
+		w.WriteHeader(http.StatusOK)
+		io.WriteString(w, envelope(map[string]interface{}{"key": wantID, "action": "deleted", "message": "deleted"}))
 	}))
 	defer ts.Close()
 
@@ -317,16 +317,15 @@ func TestDeleteSecret_Success(t *testing.T) {
 	}
 }
 
-func TestDeleteSecret_Non204(t *testing.T) {
+func TestDeleteSecret_Non200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
-		io.WriteString(w, "not found")
 	}))
 	defer ts.Close()
 
 	c := newTestClient(ts, "tok")
 	err := c.DeleteSecret("id")
-	if err == nil || !strings.Contains(err.Error(), "DeleteSecret: status 404 - not found") {
+	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 404") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -336,10 +335,10 @@ func TestBootstrap_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Fatalf("method = %s, want GET", r.Method)
 		}
-		if r.URL.Path != "/bootstrap/lighthouse" {
-			t.Fatalf("path = %s, want /bootstrap/lighthouse", r.URL.Path)
+		if r.URL.Path != "/v0/bootstrap/lighthouse" {
+			t.Fatalf("path = %s, want /v0/bootstrap/lighthouse", r.URL.Path)
 		}
-		io.WriteString(w, `{"secret":"beacon"}`)
+		io.WriteString(w, envelope(map[string]interface{}{"secret": "beacon"}))
 	}))
 	defer ts.Close()
 
@@ -355,27 +354,94 @@ func TestBootstrap_Success(t *testing.T) {
 
 func TestBootstrap_Non200(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusInternalServerError)
-		io.WriteString(w, "fail")
+		w.WriteHeader(http.StatusForbidden)
 	}))
 	defer ts.Close()
 
 	c := newTestClient(ts, "tok")
 	_, err := c.Bootstrap()
-	if err == nil || !strings.Contains(err.Error(), "boostrap: bad status 500") {
+	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 403") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestHealth_Success(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/v0/health" {
+			t.Fatalf("path = %s, want /v0/health", r.URL.Path)
+		}
+		io.WriteString(w, envelope(map[string]interface{}{"healthy": true, "time": time.Now().Format(time.RFC3339)}))
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts, "tok")
+	healthy, err := c.Health()
+	if err != nil {
+		t.Fatalf("Health error: %v", err)
+	}
+	if !healthy {
+		t.Fatalf("Health = false, want true")
+	}
+}
+
+func TestHealth_Non200(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts, "tok")
+	_, err := c.Health()
+	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 500") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestAuth_Success(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			t.Fatalf("method = %s, want GET", r.Method)
+		}
+		if r.URL.Path != "/v0/auth" {
+			t.Fatalf("path = %s, want /v0/auth", r.URL.Path)
+		}
+		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
+			t.Fatalf("Authorization = %q", got)
+		}
+		io.WriteString(w, envelope(map[string]interface{}{"authenticated": true, "time": time.Now().Format(time.RFC3339)}))
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts, "tok")
+	if err := c.Auth(); err != nil {
+		t.Fatalf("Auth error: %v", err)
+	}
+}
+
+func TestAuth_Non200(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+	}))
+	defer ts.Close()
+
+	c := newTestClient(ts, "tok")
+	err := c.Auth()
+	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 401") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
 func TestHTTPDoError_Propagates(t *testing.T) {
-	// Arrange a transport that always fails
 	oldTransport := http.DefaultTransport
 	http.DefaultClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("boom")
 	})
 	defer func() { http.DefaultClient.Transport = oldTransport }()
 
-	c := &Client{BaseURL: "http://example", ClientSecret: "tok"}
+	c := &Client{BaseURL: "http://example", ClientSecret: "tok", Platform: "test"}
 
 	if _, err := c.GetSecret("id"); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("GetSecret should propagate transport error, got %v", err)
