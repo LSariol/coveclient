@@ -110,11 +110,11 @@ func TestGetAllSecrets_Success(t *testing.T) {
 
 	entries := []map[string]interface{}{
 		{
-			"key":         "k1",
-			"version":     1,
+			"key":          "k1",
+			"version":      1,
 			"times_pulled": 3,
-			"created_at":  t1.Format(time.RFC3339),
-			"updated_at":  t2.Format(time.RFC3339),
+			"created_at":   t1.Format(time.RFC3339),
+			"updated_at":   t2.Format(time.RFC3339),
 		},
 	}
 
@@ -435,13 +435,10 @@ func TestAuth_Non200(t *testing.T) {
 }
 
 func TestHTTPDoError_Propagates(t *testing.T) {
-	oldTransport := http.DefaultTransport
-	http.DefaultClient.Transport = roundTripperFunc(func(r *http.Request) (*http.Response, error) {
+	failing := &http.Client{Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("boom")
-	})
-	defer func() { http.DefaultClient.Transport = oldTransport }()
-
-	c := &Client{BaseURL: "http://example", ClientSecret: "tok", Platform: "test"}
+	})}
+	c := New("http://example", "tok", "test", WithHTTPClient(failing))
 
 	if _, err := c.GetSecret("id"); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("GetSecret should propagate transport error, got %v", err)
