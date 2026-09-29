@@ -17,6 +17,11 @@ var (
 	ErrNotFound      = errors.New("not found")      // 404: no secret with that key
 	ErrUnauthorized  = errors.New("unauthorized")   // 401: the token is missing or wrong
 	ErrAlreadyExists = errors.New("already exists") // 409: AddSecret on an existing key
+
+	// ErrForbidden means the client's project token doesn't cover the key:
+	// it can't read it, or can't change it (403 forbidden_key). Grant access
+	// in the Cove CLI with `token allow <key> <project>`.
+	ErrForbidden = errors.New("forbidden")
 )
 
 // APIError is returned when Cove answers with a status other than the one that
@@ -53,6 +58,8 @@ func (e *APIError) Is(target error) bool {
 		return e.StatusCode == http.StatusUnauthorized
 	case ErrAlreadyExists:
 		return e.StatusCode == http.StatusConflict
+	case ErrForbidden:
+		return e.StatusCode == http.StatusForbidden && e.Type == "forbidden_key"
 	case ErrInvalidKey:
 		return e.StatusCode == http.StatusBadRequest && e.Type == "invalid_key"
 	case ErrBootstrapClosed:

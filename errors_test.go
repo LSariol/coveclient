@@ -47,8 +47,9 @@ func TestSentinelErrors(t *testing.T) {
 		{http.StatusConflict, "already_exists", ErrAlreadyExists},
 		{http.StatusBadRequest, "invalid_key", ErrInvalidKey},
 		{http.StatusForbidden, "bootstrap_locked", ErrBootstrapClosed},
+		{http.StatusForbidden, "forbidden_key", ErrForbidden},
 	}
-	all := []error{ErrNotFound, ErrUnauthorized, ErrAlreadyExists, ErrInvalidKey, ErrBootstrapClosed}
+	all := []error{ErrNotFound, ErrUnauthorized, ErrAlreadyExists, ErrInvalidKey, ErrBootstrapClosed, ErrForbidden}
 
 	for _, tc := range cases {
 		err := &APIError{Method: "X", StatusCode: tc.status, Type: tc.errType}

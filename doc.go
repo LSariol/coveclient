@@ -11,7 +11,12 @@
 //
 // Every method has a ...Context version that takes a context.Context. Failed
 // requests return an *APIError, which matches ErrNotFound, ErrUnauthorized,
-// ErrAlreadyExists, ErrInvalidKey or ErrBootstrapClosed with errors.Is.
+// ErrForbidden, ErrAlreadyExists, ErrInvalidKey or ErrBootstrapClosed with
+// errors.Is.
+//
+// The token can be Cove's master token or a project token (`token create` in
+// the Cove CLI), which only reaches the keys it was given; the client works
+// the same with either.
 //
 // Requests time out after DefaultTimeout (15 seconds); change it with
 // WithTimeout, or supply your own http.Client with WithHTTPClient.
