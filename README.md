@@ -2,6 +2,8 @@
 
 A lightweight, dependency-free Go client for [Cove](https://github.com/LSariol/cove) — a self-hosted secret management service.
 
+> Full documentation (internals, deployment, error reference, known issues): [DOCUMENTATION.md](DOCUMENTATION.md)
+
 ## Features
 
 - Full CRUD operations on secrets
