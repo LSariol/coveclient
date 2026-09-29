@@ -17,10 +17,12 @@ import (
 // changed with WithTimeout or WithHTTPClient.
 const DefaultTimeout = 15 * time.Second
 
+// Client talks to one Cove server. Create it with New. A Client is safe to use
+// from several goroutines, as long as its fields aren't changed meanwhile.
 type Client struct {
-	BaseURL      string
-	ClientSecret string
-	Platform     string
+	BaseURL      string // e.g. "http://10.0.0.159:2100"
+	ClientSecret string // the token sent as "Authorization: Bearer ..."
+	Platform     string // your app's name, sent as X-Cove-Source
 
 	hc      *http.Client
 	timeout time.Duration

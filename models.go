@@ -5,14 +5,17 @@ import (
 	"time"
 )
 
+// PublicSecretEntry describes a secret without its value, as listed by
+// GetAllSecrets.
 type PublicSecretEntry struct {
 	Key          string    `json:"key"`
-	Version      int       `json:"version"`
-	TimesPulled  int       `json:"times_pulled"`
+	Version      int       `json:"version"`      // goes up by one on each update
+	TimesPulled  int       `json:"times_pulled"` // how many times it has been read
 	DateAdded    time.Time `json:"created_at"`
 	LastModified time.Time `json:"updated_at"`
 }
 
+// SecretValue is the token returned by Cove's bootstrap endpoint.
 type SecretValue struct {
 	Secret string `json:"secret"`
 }
