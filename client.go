@@ -131,7 +131,7 @@ func (c *Client) do(ctx context.Context, r request, out any) error {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != r.want {
-		return fmt.Errorf("coveClient: %s: Unexpected Status %d", r.name, resp.StatusCode)
+		return newAPIError(r.name, resp)
 	}
 
 	return decodeEnvelope(resp, out)
