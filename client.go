@@ -82,6 +82,12 @@ func (c *Client) httpClient() *http.Client {
 	return defaultHTTPClient
 }
 
+// url joins BaseURL and path. A trailing slash on BaseURL is ignored: it would
+// make the path start with "//", which Cove answers with a redirect.
+func (c *Client) url(path string) string {
+	return strings.TrimRight(c.BaseURL, "/") + path
+}
+
 // request describes one API call.
 type request struct {
 	name   string // the Client method, for error messages
@@ -104,7 +110,7 @@ func (c *Client) do(ctx context.Context, r request, out any) error {
 		body = bytes.NewReader(data)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, r.method, c.BaseURL+r.path, body)
+	req, err := http.NewRequestWithContext(ctx, r.method, c.url(r.path), body)
 	if err != nil {
 		return err
 	}

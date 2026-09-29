@@ -59,7 +59,7 @@ func (c *Client) LoadOrBootstrap(path string) (string, error) {
 
 // fetchBootstrapToken calls the bootstrap endpoint and explains a refusal.
 func (c *Client) fetchBootstrapToken() (string, error) {
-	resp, err := c.httpClient().Get(c.BaseURL + "/v0/bootstrap/lighthouse")
+	resp, err := c.httpClient().Get(c.url("/v0/bootstrap/lighthouse"))
 	if err != nil {
 		return "", err
 	}
@@ -167,7 +167,7 @@ func (c *Client) checkStatus(ctx context.Context, path string) int {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.url(path), nil)
 	if err != nil {
 		return 0
 	}

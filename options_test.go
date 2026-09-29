@@ -79,3 +79,20 @@ func TestWithHTTPClient(t *testing.T) {
 		t.Fatalf("Health through a custom client = %v, %v (used %v)", ok, err, used)
 	}
 }
+
+func TestTrailingSlashInBaseURL(t *testing.T) {
+	var method, path string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		method, path = r.Method, r.URL.Path
+		w.WriteHeader(http.StatusCreated)
+		io.WriteString(w, envelope(map[string]string{"key": "app.key", "action": "created", "message": "ok"}))
+	}))
+	defer ts.Close()
+
+	if _, err := New(ts.URL+"/", "tok", "test").AddSecret("app.key", "x"); err != nil {
+		t.Fatal(err)
+	}
+	if method != "POST" || path != "/v0/secrets/app.key" {
+		t.Fatalf("request = %s %s, want POST /v0/secrets/app.key", method, path)
+	}
+}
