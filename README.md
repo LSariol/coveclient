@@ -46,8 +46,22 @@ Authenticated. Returns `nil` if the client secret is valid.
 err := c.Auth()
 ```
 
+### `LoadOrBootstrap(path string) (string, error)`
+Onboarding in one call: reads the token from `path`, or fetches it from Cove's bootstrap endpoint (open it with `bootstrap open` in the Cove CLI), saves it to `path` (`600`), and sets it on the client. Call it on every start. If Cove refuses, the error wraps `ErrBootstrapClosed`.
+
+```go
+token, err := c.LoadOrBootstrap("/data/cove-token")
+```
+
+### `WaitForReady(ctx) error`
+Waits until Cove and its database are up, retrying until `ctx` is done.
+
+```go
+err := c.WaitForReady(ctx)
+```
+
 ### `Bootstrap() (string, error)`
-Unauthenticated. Returns the `COVE_CLIENT_SECRET` on first call. Subsequent calls return an error until the marker is cleared via the Cove CLI (`bootstrap clear`).
+Unauthenticated. Returns the `COVE_CLIENT_SECRET` while Cove's bootstrap endpoint is open (`bootstrap open` in the Cove CLI). Doesn't save it; prefer `LoadOrBootstrap`.
 
 ```go
 secret, err := c.Bootstrap()

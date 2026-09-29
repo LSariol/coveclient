@@ -96,7 +96,7 @@ type Client struct {
 
 ## 4. Method reference
 
-Every method makes exactly one HTTP request with `http.DefaultClient`. None of them take a `context.Context`.
+Every method uses `http.DefaultClient`. Apart from `WaitForReady`, none of them take a `context.Context`.
 
 | Method | HTTP | Auth | `X-Cove-Source` | Expected status | Returns |
 |---|---|---|---|---|---|
@@ -108,6 +108,8 @@ Every method makes exactly one HTTP request with `http.DefaultClient`. None of t
 | `AddSecret(id, value)` | `POST /v0/secrets/{id}` | ✓ | ✓ | **201** | `(string, error)` |
 | `UpdateSecret(id, value)` | `PATCH /v0/secrets/{id}` | ✓ | ✓ | 200 | `error` |
 | `DeleteSecret(id)` | `DELETE /v0/secrets/{id}` | ✓ | ✓ | 200 | `error` |
+| `LoadOrBootstrap(path)` | reads `path`, or `GET /v0/bootstrap/lighthouse` then `GET /v0/auth` | – | – | 200 | `(string, error)` |
+| `WaitForReady(ctx)` | `GET /v0/ready` (falls back to `/v0/health`), repeated | – | – | 200 | `error` |
 
 ### `Health() (bool, error)`
 
@@ -134,9 +136,40 @@ if err == nil {
 }
 ```
 
-- The first successful call locks the endpoint on the server. Later calls return `Unexpected Status 403` until someone runs `bootstrap clear` in the Cove CLI.
-- It does **not** set `c.ClientSecret` for you.
-- Store the returned secret yourself (for example in the app's own `.env`). If you lose it, you need the Cove CLI to reopen bootstrap.
+- It only works while someone has opened the endpoint with `bootstrap open` in the Cove CLI (for 10 minutes by default, and closed again after one handout). Otherwise it returns `Unexpected Status 403`.
+- It does **not** set `c.ClientSecret` or save the token for you. **Prefer `LoadOrBootstrap`**, which does both safely.
+
+### `LoadOrBootstrap(path string) (string, error)`
+
+Gets this client's token and sets `c.ClientSecret`. Call it on every start:
+
+```go
+c := coveclient.New("http://cove:2100", "", "lighthouse")
+token, err := c.LoadOrBootstrap("/data/cove-token")
+if errors.Is(err, coveclient.ErrBootstrapClosed) {
+    log.Fatal("Run `bootstrap open` in the Cove CLI, then restart: ", err)
+}
+```
+
+- **The file at `path` exists:** the token is read from it. No request is made.
+- **It doesn't:** the token is fetched from Cove's bootstrap endpoint, **saved to `path` immediately** (permissions `600`, written to a temporary file and renamed, so a crash can't leave a partial file), then checked with `Auth()`.
+- **Cove refuses** (endpoint closed, window expired, or address not allowed): the error wraps `ErrBootstrapClosed` and includes Cove's reason.
+- If the client crashes right after receiving the token, Cove hands it to the same address again for 2 minutes, so the next start still succeeds.
+- To bootstrap again (e.g. after the token was rotated), delete the file and run `bootstrap open`.
+
+### `WaitForReady(ctx context.Context) error`
+
+Waits until Cove is up **and** its database is reachable, retrying with a growing delay (up to 5 seconds) until `ctx` is done. Use it at startup when your app and Cove start together:
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+defer cancel()
+if err := c.WaitForReady(ctx); err != nil {
+    log.Fatal(err) // "coveClient: Cove at http://cove:2100 wasn't ready: context deadline exceeded"
+}
+```
+
+It uses `/v0/ready`, and falls back to `/v0/health` for Cove versions older than 1.0.0.
 
 ### `GetSecret(id string) (string, error)`
 
@@ -215,7 +248,7 @@ The status code is checked **before** the body is decoded. Cove always sends non
 |---|---|
 | 400 | Invalid key characters/length, missing `X-Cove-Source` (empty platform), bad body |
 | 401 | Wrong/empty `ClientSecret`, or Cove hasn't loaded its secret yet (first-run issue on Cove) |
-| 403 | `Bootstrap()` already used |
+| 403 | `Bootstrap()` while Cove's bootstrap endpoint is closed (use `LoadOrBootstrap`, whose error explains why) |
 | 404 | Key not found (GET/DELETE), or Cove failed to decrypt it |
 | 405 | Method not allowed. Shouldn't happen unless routes drift. |
 | 500 | Duplicate key on Add, missing key on Update, DB error |
@@ -256,14 +289,13 @@ Each `GetSecret` call counts as a pull and adds a row to Cove's event log. Fetch
 
 ### Waiting for Cove on startup (Docker)
 
-If your app starts alongside Cove, wait for it to be healthy first:
+If your app starts alongside Cove, wait for it first:
 
 ```go
-for i := 0; i < 30; i++ {
-    if ok, _ := c.Health(); ok {
-        break
-    }
-    time.Sleep(2 * time.Second)
+ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+defer cancel()
+if err := c.WaitForReady(ctx); err != nil {
+    return err
 }
 ```
 
@@ -272,18 +304,16 @@ Or in compose, use `depends_on: { cove: { condition: service_healthy } }`, since
 ### First-boot bootstrap
 
 ```go
-secret := os.Getenv("COVE_CLIENT_SECRET")
-c := coveclient.New(coveURL, secret, "lighthouse")
-
-if secret == "" {
-    s, err := c.Bootstrap()
-    if err != nil {
-        return fmt.Errorf("bootstrap (run `bootstrap clear` in the Cove CLI?): %w", err)
-    }
-    c.ClientSecret = s
-    // persist s so the next start doesn't need bootstrap
+c := coveclient.New(coveURL, "", "lighthouse")
+if err := c.WaitForReady(ctx); err != nil {
+    return err
+}
+if _, err := c.LoadOrBootstrap("/data/cove-token"); err != nil {
+    return err // wraps ErrBootstrapClosed if Cove's endpoint isn't open
 }
 ```
+
+The first time, run `bootstrap open` in the Cove CLI before starting the client. Keep `/data` on a persistent volume, so the token survives restarts.
 
 ### Network addressing
 
