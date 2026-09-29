@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -40,7 +42,8 @@ func WithHTTPClient(hc *http.Client) Option {
 }
 
 // New returns a Client for the Cove server at baseURL. platformName identifies
-// your app in Cove's event log (sent as X-Cove-Source) and is lowercased.
+// your app in Cove's event log (sent as X-Cove-Source) and is lowercased. If
+// it's empty, the program's name is used.
 func New(baseURL string, clientSecret string, platformName string, opts ...Option) *Client {
 	c := &Client{
 		BaseURL:      baseURL,
@@ -88,6 +91,26 @@ func (c *Client) url(path string) string {
 	return strings.TrimRight(c.BaseURL, "/") + path
 }
 
+// source returns the name sent as X-Cove-Source. Cove refuses requests
+// without one, so an empty Platform falls back to the program's name.
+func (c *Client) source() string {
+	if p := strings.TrimSpace(c.Platform); p != "" {
+		return p
+	}
+	return programName()
+}
+
+// programName returns the running program's file name, lowercased and without
+// ".exe", e.g. "lighthouse".
+func programName() string {
+	name := strings.ToLower(filepath.Base(os.Args[0]))
+	name = strings.TrimSuffix(name, ".exe")
+	if name == "" || name == "." {
+		return "coveclient"
+	}
+	return name
+}
+
 // request describes one API call.
 type request struct {
 	name   string // the Client method, for error messages
@@ -121,7 +144,7 @@ func (c *Client) do(ctx context.Context, r request, out any) error {
 		req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
 	}
 	if r.source {
-		req.Header.Set("X-Cove-Source", c.Platform)
+		req.Header.Set("X-Cove-Source", c.source())
 	}
 
 	resp, err := c.httpClient().Do(req)

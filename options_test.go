@@ -96,3 +96,23 @@ func TestTrailingSlashInBaseURL(t *testing.T) {
 		t.Fatalf("request = %s %s, want POST /v0/secrets/app.key", method, path)
 	}
 }
+
+func TestEmptyPlatformUsesProgramName(t *testing.T) {
+	var got string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		got = r.Header.Get("X-Cove-Source")
+		io.WriteString(w, envelope(map[string]any{"key": "app.key", "action": "deleted"}))
+	}))
+	defer ts.Close()
+
+	if err := New(ts.URL, "tok", "").DeleteSecret("app.key"); err != nil {
+		t.Fatal(err)
+	}
+	if got == "" || got != programName() {
+		t.Fatalf("X-Cove-Source = %q, want the program name %q", got, programName())
+	}
+
+	if err := New(ts.URL, "tok", "MyApp").DeleteSecret("app.key"); err != nil || got != "myapp" {
+		t.Fatalf("X-Cove-Source = %q, %v; want myapp", got, err)
+	}
+}
