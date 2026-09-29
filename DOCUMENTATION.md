@@ -305,6 +305,7 @@ Use `errors.Is` with the sentinel errors:
 |---|---|
 | `ErrNotFound` | `404` (no such secret); also `GetSecrets` with missing keys |
 | `ErrUnauthorized` | `401` (missing or wrong token) |
+| `ErrForbidden` | `403 forbidden_key` (a project token that can't read or change this key) |
 | `ErrAlreadyExists` | `409` (`AddSecret` on an existing key) |
 | `ErrInvalidKey` | a key refused by `ValidateKey`, or Cove's `400 invalid_key` |
 | `ErrBootstrapClosed` | `403` from the bootstrap endpoint (`bootstrap_locked`, `bootstrap_expired`, `bootstrap_forbidden`) |
@@ -336,7 +337,7 @@ If the response body isn't Cove's JSON (for example an HTML error page from a pr
 |---|---|
 | 400 | Invalid key (normally caught before sending), missing `X-Cove-Source`, bad body |
 | 401 | Wrong/empty `ClientSecret`, or Cove hasn't loaded its secret yet |
-| 403 | Bootstrap endpoint closed, expired, or not allowed from this address |
+| 403 | A project token that doesn't cover the key (`forbidden_key`), or the bootstrap endpoint is closed, expired, or not allowed from this address |
 | 404 | No secret with that key |
 | 405 | Method not allowed. Shouldn't happen unless routes drift. |
 | 409 | `AddSecret` on a key that exists |
@@ -398,6 +399,14 @@ A complete, runnable version is `examples/basic` (`COVE_URL=... go run ./example
 - Same Docker network as Cove (`spark`): `http://cove:2100`
 - From the host: `http://localhost:2100`
 - Local dev Cove: `http://localhost:2110`
+
+### Project tokens
+
+Cove 1.0.0 can give each project its own token, limited to certain keys (`token create lighthouse --allow 'lighthouse.*'` in the Cove CLI). Nothing changes in your code: pass the project token wherever you passed `COVE_CLIENT_SECRET`, or let `LoadOrBootstrap` fetch it (`bootstrap open lighthouse` hands out Lighthouse's own token). Differences you may notice:
+
+- A key outside the token's access fails with an error matching `ErrForbidden`, whether or not the key exists.
+- `GetAllSecrets` lists only the keys the token can read.
+- Cove's event log records the token's name as the source; `platformName` is ignored.
 
 ### Handling the client secret
 

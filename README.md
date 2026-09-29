@@ -27,7 +27,9 @@ import "github.com/lsariol/coveclient"
 c := coveclient.New("http://cove.internal:2100", "<COVE_CLIENT_SECRET>", "my-app")
 ```
 
-The third argument (`platformName`) is sent as the `X-Cove-Source` header on every secret operation and is recorded in Cove's event log. If it's empty, the program's name is used.
+The token can be Cove's master token or a **project token** made with `token create` in the Cove CLI, which only reaches the keys it was given. The client works the same with either.
+
+The third argument (`platformName`) is sent as the `X-Cove-Source` header on every secret operation and is recorded in Cove's event log. If it's empty, the program's name is used. (With a project token, Cove records the token's name instead.)
 
 Options go after it:
 
@@ -163,6 +165,7 @@ Check for common cases with `errors.Is`:
 |---|---|
 | `ErrNotFound` | 404: no secret with that key |
 | `ErrUnauthorized` | 401: the token is missing or wrong |
+| `ErrForbidden` | 403: a project token that doesn't cover this key |
 | `ErrAlreadyExists` | 409: `AddSecret` on a key that exists |
 | `ErrInvalidKey` | the key breaks Cove's rule (checked before sending) |
 | `ErrBootstrapClosed` | Cove refused to hand out the token |
