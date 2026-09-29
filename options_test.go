@@ -1,6 +1,8 @@
 package coveclient
 
 import (
+	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -114,5 +116,22 @@ func TestEmptyPlatformUsesProgramName(t *testing.T) {
 
 	if err := New(ts.URL, "tok", "MyApp").DeleteSecret("app.key"); err != nil || got != "myapp" {
 		t.Fatalf("X-Cove-Source = %q, %v; want myapp", got, err)
+	}
+}
+
+func TestContextCancelsRequest(t *testing.T) {
+	release := make(chan struct{})
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+	}))
+	defer ts.Close()
+	defer close(release)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+
+	_, err := New(ts.URL, "tok", "test").GetSecretContext(ctx, "app.key")
+	if !errors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
 	}
 }

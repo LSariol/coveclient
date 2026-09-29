@@ -177,8 +177,16 @@ func decodeEnvelope(resp *http.Response, out interface{}) error {
 	return nil
 }
 
-func (c *Client) GetSecret(id string) (string, error) {
-	path, err := secretPath(id)
+// GetSecret returns the value of the secret named key. It is
+// GetSecretContext with context.Background().
+func (c *Client) GetSecret(key string) (string, error) {
+	return c.GetSecretContext(context.Background(), key)
+}
+
+// GetSecretContext returns the value of the secret named key. If there is no
+// such secret, the error matches ErrNotFound.
+func (c *Client) GetSecretContext(ctx context.Context, key string) (string, error) {
+	path, err := secretPath(key)
 	if err != nil {
 		return "", err
 	}
@@ -188,7 +196,7 @@ func (c *Client) GetSecret(id string) (string, error) {
 		Value   string `json:"value"`
 		Version int    `json:"version"`
 	}
-	err = c.do(context.Background(), request{
+	err = c.do(ctx, request{
 		name: "GetSecret", method: http.MethodGet, path: path,
 		auth: true, source: true, want: http.StatusOK,
 	}, &data)
@@ -197,17 +205,24 @@ func (c *Client) GetSecret(id string) (string, error) {
 	}
 	// Cove versions before 1.0.0 may leave the key out; a different key means
 	// the request reached the wrong secret, so its value mustn't be used.
-	if data.Key != "" && data.Key != id {
-		return "", fmt.Errorf("coveClient: GetSecret: asked for %q but Cove returned %q", id, data.Key)
+	if data.Key != "" && data.Key != key {
+		return "", fmt.Errorf("coveClient: GetSecret: asked for %q but Cove returned %q", key, data.Key)
 	}
 	return data.Value, nil
 }
 
+// GetAllSecrets lists every secret's key and details, without values. It is
+// GetAllSecretsContext with context.Background().
 func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
+	return c.GetAllSecretsContext(context.Background())
+}
+
+// GetAllSecretsContext lists every secret's key and details, without values.
+func (c *Client) GetAllSecretsContext(ctx context.Context) ([]PublicSecretEntry, error) {
 	var data struct {
 		Secrets []PublicSecretEntry `json:"secrets"`
 	}
-	err := c.do(context.Background(), request{
+	err := c.do(ctx, request{
 		name: "GetAllSecrets", method: http.MethodGet, path: "/v0/secrets",
 		auth: true, want: http.StatusOK,
 	}, &data)
@@ -217,8 +232,17 @@ func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
 	return data.Secrets, nil
 }
 
-func (c *Client) AddSecret(id string, value string) (string, error) {
-	path, err := secretPath(id)
+// AddSecret creates a secret and returns Cove's confirmation message. It is
+// AddSecretContext with context.Background().
+func (c *Client) AddSecret(key string, value string) (string, error) {
+	return c.AddSecretContext(context.Background(), key, value)
+}
+
+// AddSecretContext creates a secret and returns Cove's confirmation message.
+// If the key is taken, the error matches ErrAlreadyExists; use UpdateSecret to
+// change an existing secret.
+func (c *Client) AddSecretContext(ctx context.Context, key string, value string) (string, error) {
+	path, err := secretPath(key)
 	if err != nil {
 		return "", err
 	}
@@ -228,7 +252,7 @@ func (c *Client) AddSecret(id string, value string) (string, error) {
 		Action  string `json:"action"`
 		Message string `json:"message"`
 	}
-	err = c.do(context.Background(), request{
+	err = c.do(ctx, request{
 		name: "AddSecret", method: http.MethodPost, path: path,
 		body: secretPayload{Value: value}, auth: true, source: true, want: http.StatusCreated,
 	}, &data)
@@ -238,33 +262,59 @@ func (c *Client) AddSecret(id string, value string) (string, error) {
 	return data.Message, nil
 }
 
-func (c *Client) UpdateSecret(id string, value string) error {
-	path, err := secretPath(id)
+// UpdateSecret changes an existing secret's value. It is UpdateSecretContext
+// with context.Background().
+func (c *Client) UpdateSecret(key string, value string) error {
+	return c.UpdateSecretContext(context.Background(), key, value)
+}
+
+// UpdateSecretContext changes an existing secret's value. If there is no such
+// secret, the error matches ErrNotFound.
+func (c *Client) UpdateSecretContext(ctx context.Context, key string, value string) error {
+	path, err := secretPath(key)
 	if err != nil {
 		return err
 	}
 
-	return c.do(context.Background(), request{
+	return c.do(ctx, request{
 		name: "UpdateSecret", method: http.MethodPatch, path: path,
 		body: secretPayload{Value: value}, auth: true, source: true, want: http.StatusOK,
 	}, nil)
 }
 
-func (c *Client) DeleteSecret(id string) error {
-	path, err := secretPath(id)
+// DeleteSecret deletes a secret. It is DeleteSecretContext with
+// context.Background().
+func (c *Client) DeleteSecret(key string) error {
+	return c.DeleteSecretContext(context.Background(), key)
+}
+
+// DeleteSecretContext deletes a secret. Cove keeps its history, so it can be
+// restored with `restore` in the Cove CLI. If there is no such secret, the
+// error matches ErrNotFound.
+func (c *Client) DeleteSecretContext(ctx context.Context, key string) error {
+	path, err := secretPath(key)
 	if err != nil {
 		return err
 	}
 
-	return c.do(context.Background(), request{
+	return c.do(ctx, request{
 		name: "DeleteSecret", method: http.MethodDelete, path: path,
 		auth: true, source: true, want: http.StatusOK,
 	}, nil)
 }
 
+// Bootstrap fetches the client token from Cove's bootstrap endpoint. Most
+// programs should call LoadOrBootstrap instead, which also saves the token.
+// It is BootstrapContext with context.Background().
 func (c *Client) Bootstrap() (string, error) {
+	return c.BootstrapContext(context.Background())
+}
+
+// BootstrapContext fetches the client token from Cove's bootstrap endpoint.
+// If Cove refuses, the error matches ErrBootstrapClosed.
+func (c *Client) BootstrapContext(ctx context.Context) (string, error) {
 	var data SecretValue
-	err := c.do(context.Background(), request{
+	err := c.do(ctx, request{
 		name: "Bootstrap", method: http.MethodGet, path: "/v0/bootstrap/lighthouse",
 		want: http.StatusOK,
 	}, &data)
@@ -274,12 +324,20 @@ func (c *Client) Bootstrap() (string, error) {
 	return data.Secret, nil
 }
 
+// Health reports whether Cove is running. It is HealthContext with
+// context.Background().
 func (c *Client) Health() (bool, error) {
+	return c.HealthContext(context.Background())
+}
+
+// HealthContext reports whether Cove is running. It doesn't check Cove's
+// database; WaitForReady does.
+func (c *Client) HealthContext(ctx context.Context) (bool, error) {
 	var data struct {
 		Healthy bool   `json:"healthy"`
 		Time    string `json:"time"`
 	}
-	err := c.do(context.Background(), request{
+	err := c.do(ctx, request{
 		name: "Health", method: http.MethodGet, path: "/v0/health",
 		want: http.StatusOK,
 	}, &data)
@@ -289,8 +347,16 @@ func (c *Client) Health() (bool, error) {
 	return data.Healthy, nil
 }
 
+// Auth checks that the client's token is accepted. It is AuthContext with
+// context.Background().
 func (c *Client) Auth() error {
-	return c.do(context.Background(), request{
+	return c.AuthContext(context.Background())
+}
+
+// AuthContext checks that the client's token is accepted. If it isn't, the
+// error matches ErrUnauthorized.
+func (c *Client) AuthContext(ctx context.Context) error {
+	return c.do(ctx, request{
 		name: "Auth", method: http.MethodGet, path: "/v0/auth",
 		auth: true, want: http.StatusOK,
 	}, nil)
