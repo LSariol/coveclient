@@ -172,6 +172,11 @@ func (c *Client) GetSecret(id string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	// Cove versions before 1.0.0 may leave the key out; a different key means
+	// the request reached the wrong secret, so its value mustn't be used.
+	if data.Key != "" && data.Key != id {
+		return "", fmt.Errorf("coveClient: GetSecret: asked for %q but Cove returned %q", id, data.Key)
+	}
 	return data.Value, nil
 }
 

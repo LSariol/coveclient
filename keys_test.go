@@ -50,3 +50,15 @@ func TestKeysThatWouldChangeTheURLAreRefused(t *testing.T) {
 		t.Fatalf("%d requests were sent for invalid keys", requests)
 	}
 }
+
+func TestGetSecretChecksTheReturnedKey(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(envelope(map[string]any{"key": "other.key", "value": "wrong", "version": 1})))
+	}))
+	defer ts.Close()
+
+	value, err := New(ts.URL, "tok", "test").GetSecret("app.key")
+	if err == nil || value != "" {
+		t.Fatalf("GetSecret = %q, %v; want an error and no value", value, err)
+	}
+}
