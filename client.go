@@ -155,13 +155,18 @@ func decodeEnvelope(resp *http.Response, out interface{}) error {
 }
 
 func (c *Client) GetSecret(id string) (string, error) {
+	path, err := secretPath(id)
+	if err != nil {
+		return "", err
+	}
+
 	var data struct {
 		Key     string `json:"key"`
 		Value   string `json:"value"`
 		Version int    `json:"version"`
 	}
-	err := c.do(context.Background(), request{
-		name: "GetSecret", method: http.MethodGet, path: "/v0/secrets/" + id,
+	err = c.do(context.Background(), request{
+		name: "GetSecret", method: http.MethodGet, path: path,
 		auth: true, source: true, want: http.StatusOK,
 	}, &data)
 	if err != nil {
@@ -185,13 +190,18 @@ func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
 }
 
 func (c *Client) AddSecret(id string, value string) (string, error) {
+	path, err := secretPath(id)
+	if err != nil {
+		return "", err
+	}
+
 	var data struct {
 		Key     string `json:"key"`
 		Action  string `json:"action"`
 		Message string `json:"message"`
 	}
-	err := c.do(context.Background(), request{
-		name: "AddSecret", method: http.MethodPost, path: "/v0/secrets/" + id,
+	err = c.do(context.Background(), request{
+		name: "AddSecret", method: http.MethodPost, path: path,
 		body: secretPayload{Value: value}, auth: true, source: true, want: http.StatusCreated,
 	}, &data)
 	if err != nil {
@@ -201,15 +211,25 @@ func (c *Client) AddSecret(id string, value string) (string, error) {
 }
 
 func (c *Client) UpdateSecret(id string, value string) error {
+	path, err := secretPath(id)
+	if err != nil {
+		return err
+	}
+
 	return c.do(context.Background(), request{
-		name: "UpdateSecret", method: http.MethodPatch, path: "/v0/secrets/" + id,
+		name: "UpdateSecret", method: http.MethodPatch, path: path,
 		body: secretPayload{Value: value}, auth: true, source: true, want: http.StatusOK,
 	}, nil)
 }
 
 func (c *Client) DeleteSecret(id string) error {
+	path, err := secretPath(id)
+	if err != nil {
+		return err
+	}
+
 	return c.do(context.Background(), request{
-		name: "DeleteSecret", method: http.MethodDelete, path: "/v0/secrets/" + id,
+		name: "DeleteSecret", method: http.MethodDelete, path: path,
 		auth: true, source: true, want: http.StatusOK,
 	}, nil)
 }
