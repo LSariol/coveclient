@@ -4,7 +4,7 @@ A review of CoveClient v0.2.0: bugs, security concerns, and quality-of-life impr
 
 Server-side items (including the full Lighthouse onboarding analysis and the CLI redesign) are in Cove's `IMPROVEMENTS.md`. IDs from that file (`SEC-n`, `BUG-n`, `QOL-n`) are referenced here where relevant.
 
-> Nothing here has been implemented. This is a planning document. Unfamiliar terms are explained in the [Glossary](#9-glossary).
+> **Progress (v1.0.0, `release/1.0.0`):** every bug (CB-1 to CB-8) and most improvements are done; they're marked **Done** in the tables below, and the details sections are kept as the record of why. Still open: CS-1 (rotate the token in the gitignored `main/main.go`), CS-2, `MustGetSecret` from CQ-5, CQ-9 and CQ-11. Unfamiliar terms are explained in the [Glossary](#9-glossary).
 
 ---
 
@@ -42,7 +42,7 @@ Every project imports `v0.2.0`, so every proposal follows these rules:
 1. **Existing functions keep their exact signatures.** New behavior comes through *new* functions, or optional extra arguments at the end of `New`. For example, `New(url, secret, platform)` keeps compiling when `New` gains optional settings, because Go lets callers leave those out.
 2. **Error messages keep their current wording** (`coveClient: <Method>: Unexpected Status N`). Extra detail is only *added to the end*, so any project that checks for that text still works.
 3. **Defaults only get safer.** For example, a default timeout only affects requests that would otherwise have hung forever.
-4. **New features ship as a new version (`v0.3.0`).** Your projects stay on `v0.2.0` until you run `go get` in each one, whenever you like. `v0.2.0` keeps working because Cove promises not to change the `/v0` API.
+4. **New features ship as a new version (released as `v1.0.0`).** Your projects stay on `v0.2.0` until you run `go get` in each one, whenever you like. `v0.2.0` keeps working because Cove promises not to change the `/v0` API.
 
 ---
 
@@ -54,35 +54,35 @@ Every project imports `v0.2.0`, so every proposal follows these rules:
 |---|---|---|---|---|---|
 | [CS-1](#cs-1-real-looking-token-hard-coded-in-mainmaingo) | Real-looking token hard-coded in `main/main.go` | Medium | S | Medium | Safe |
 | [CS-2](#cs-2-token-sent-over-plain-http-with-no-warning) | Token sent over plain HTTP with no warning | Low | S | Low | Safe |
-| [CS-3](#cs-3-bootstrap-leaves-token-storage-to-each-caller) | `Bootstrap()` leaves token storage to each caller | Low | (CQ-4) | Medium | Safe |
+| [CS-3](#cs-3-bootstrap-leaves-token-storage-to-each-caller) | `Bootstrap()` leaves token storage to each caller — **Done** | Low | (CQ-4) | Medium | Safe |
 
 ### Bugs
 
 | ID | Issue | Criticality | Effort | Improvement | Compat |
 |---|---|---|---|---|---|
-| [CB-1](#cb-1-keys-arent-escaped-so-wrong-or-empty-secrets-are-returned-silently) | Keys aren't escaped, so the **wrong or empty secret is returned with no error** | **High** | S | High | Safe |
-| [CB-2](#cb-2-no-timeout-so-calls-can-hang-forever) | No timeout, so calls can hang forever | Medium | S | High | Safe |
-| [CB-3](#cb-3-cove-error-details-are-thrown-away) | Cove's error type/message is thrown away | Medium | S | High | Safe |
-| [CB-4](#cb-4-trailing-slash-in-baseurl-breaks-writes) | Trailing slash in `baseURL` turns writes into reads | Medium | S | Medium | Safe |
-| [CB-5](#cb-5-response-key-isnt-checked) | Response key isn't checked against the requested key | Low | S | Medium | Safe |
-| [CB-6](#cb-6-empty-platformname-fails-silently-later) | Empty `platformName` fails later with confusing 400s | Low | S | Low | Safe |
-| [CB-7](#cb-7-inconsistent-error-prefixes) | Inconsistent error prefixes | Low | S | Low | Safe |
-| [CB-8](#cb-8-test-restores-global-transport-incorrectly) | Test restores the global transport incorrectly | Low | S | Low | Safe |
+| [CB-1](#cb-1-keys-arent-escaped-so-wrong-or-empty-secrets-are-returned-silently) | Keys aren't escaped, so the **wrong or empty secret is returned with no error** — **Done** | **High** | S | High | Safe |
+| [CB-2](#cb-2-no-timeout-so-calls-can-hang-forever) | No timeout, so calls can hang forever — **Done** | Medium | S | High | Safe |
+| [CB-3](#cb-3-cove-error-details-are-thrown-away) | Cove's error type/message is thrown away — **Done** | Medium | S | High | Safe |
+| [CB-4](#cb-4-trailing-slash-in-baseurl-breaks-writes) | Trailing slash in `baseURL` turns writes into reads — **Done** | Medium | S | Medium | Safe |
+| [CB-5](#cb-5-response-key-isnt-checked) | Response key isn't checked against the requested key — **Done** | Low | S | Medium | Safe |
+| [CB-6](#cb-6-empty-platformname-fails-silently-later) | Empty `platformName` fails later with confusing 400s — **Done** | Low | S | Low | Safe |
+| [CB-7](#cb-7-inconsistent-error-prefixes) | Inconsistent error prefixes — **Done** | Low | S | Low | Safe |
+| [CB-8](#cb-8-test-restores-global-transport-incorrectly) | Test restores the global transport incorrectly — **Done** | Low | S | Low | Safe |
 
 ### Quality-of-life improvements
 
 | ID | Improvement | Criticality | Effort | Improvement | Compat |
 |---|---|---|---|---|---|
-| [CQ-1](#cq-1-options-on-new-custom-httpclient-timeout) | Options on `New` (custom `http.Client`, timeout) | Medium | S | **High** | Safe |
-| [CQ-2](#cq-2-typed-errors) | Typed errors (`errors.Is(err, ErrNotFound)`) | Medium | M | **High** | Safe |
-| [CQ-3](#cq-3-context-aware-methods) | Context-aware methods (`GetSecretContext(ctx, ...)`) | Medium | M | **High** | Safe |
-| [CQ-4](#cq-4-loadorbootstrap-helper) | `LoadOrBootstrap(path)` helper for Lighthouse-style onboarding | Medium | S | **High** | Safe |
-| [CQ-5](#cq-5-multi-secret-helpers) | Multi-secret helpers (`GetSecrets(keys...)`, `MustGetSecret`) | Low | S | Medium | Safe |
-| [CQ-6](#cq-6-waitforhealthy) | `WaitForHealthy(ctx)` / `WaitForReady(ctx)` | Low | S | Medium | Safe |
-| [CQ-7](#cq-7-godoc-comments-and-examples) | GoDoc comments and runnable examples | Low | S | Medium | Safe |
-| [CQ-8](#cq-8-exported-validatekey) | Exported `ValidateKey` | Low | S | Medium | Safe |
+| [CQ-1](#cq-1-options-on-new-custom-httpclient-timeout) | Options on `New` (custom `http.Client`, timeout) — **Done** | Medium | S | **High** | Safe |
+| [CQ-2](#cq-2-typed-errors) | Typed errors (`errors.Is(err, ErrNotFound)`) — **Done** | Medium | M | **High** | Safe |
+| [CQ-3](#cq-3-context-aware-methods) | Context-aware methods (`GetSecretContext(ctx, ...)`) — **Done** | Medium | M | **High** | Safe |
+| [CQ-4](#cq-4-loadorbootstrap-helper) | `LoadOrBootstrap(path)` helper for Lighthouse-style onboarding — **Done** | Medium | S | **High** | Safe |
+| [CQ-5](#cq-5-multi-secret-helpers) | Multi-secret helpers (`GetSecrets(keys...)`, `MustGetSecret`) — **Done** (`GetSecrets`; `MustGetSecret` not added) | Low | S | Medium | Safe |
+| [CQ-6](#cq-6-waitforhealthy) | `WaitForHealthy(ctx)` / `WaitForReady(ctx)` — **Done** | Low | S | Medium | Safe |
+| [CQ-7](#cq-7-godoc-comments-and-examples) | GoDoc comments and runnable examples — **Done** | Low | S | Medium | Safe |
+| [CQ-8](#cq-8-exported-validatekey) | Exported `ValidateKey` — **Done** | Low | S | Medium | Safe |
 | [CQ-9](#cq-9-getsecretentry-with-version) | `GetSecretEntry` returning key, value, and version | Low | S | Low | Safe |
-| [CQ-10](#cq-10-ci) | CI (vet, test, race) | Low | S | Low | Safe |
+| [CQ-10](#cq-10-ci) | CI (vet, test, race) — **Done** | Low | S | Low | Safe |
 | [CQ-11](#cq-11-opt-in-retries) | Opt-in retries for network errors | Low | M | Low | Opt-in |
 
 ---
