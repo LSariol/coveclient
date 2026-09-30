@@ -203,7 +203,7 @@ It uses `/v0/ready`, and falls back to `/v0/health` for Cove versions older than
 Returns the decrypted value. Each call adds 1 to the secret's `times_pulled` on the server and writes a `read` event tagged with your platform name.
 
 ```go
-dbURL, err := c.GetSecret("myapp.database_url")
+dbURL, err := c.GetSecret("MYAPP_DATABASE_URL")
 ```
 
 - A missing key returns an error matching `ErrNotFound`.
@@ -214,11 +214,11 @@ dbURL, err := c.GetSecret("myapp.database_url")
 Fetches several secrets and returns them keyed by name. Duplicate keys are fetched once.
 
 ```go
-s, err := c.GetSecrets("myapp.database_url", "myapp.api_key")
+s, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
 if err != nil {
-    log.Fatal(err) // coveClient: GetSecrets: not found: myapp.api_key
+    log.Fatal(err) // coveClient: GetSecrets: not found: MYAPP_TMDB_API_KEY
 }
-dbURL := s["myapp.database_url"]
+dbURL := s["MYAPP_DATABASE_URL"]
 ```
 
 - **One request** for all of them (`POST /v0/batch`). More than 100 keys are split into several requests. On a Cove without the batch endpoint, it falls back to one `GetSecret` per key.
@@ -232,7 +232,7 @@ Returns metadata for every secret, sorted by key. Values are never included. An 
 
 ### `AddSecret(key, value string) (string, error)`
 
-Creates a secret. Returns Cove's message, for example `"myapp.token has been created."`. If the key already exists, the error matches `ErrAlreadyExists` (Cove 1.0.0 and later; older Cove answers `500`).
+Creates a secret. Returns Cove's message, for example `"MYAPP_GITHUB_TOKEN has been created."`. If the key already exists, the error matches `ErrAlreadyExists` (Cove 1.0.0 and later; older Cove answers `500`).
 
 ### `UpdateSecret(key, value string) error`
 
@@ -251,7 +251,7 @@ Cove only accepts keys that:
 
 Every method that takes a key checks it with `ValidateKey` first. A bad key returns an error matching `ErrInvalidKey`, and nothing is sent. You can also call `ValidateKey` yourself, e.g. in a unit test over your project's key names.
 
-A suggested naming convention is `<project>.<name>` or `<PROJECT>_<NAME>`, which makes the Cove CLI's `list <prefix>` and `search` useful.
+Keys follow Cove's naming standard, **`PROJECT_PLATFORM_TYPE`** (e.g. `BOTSUITE_TWITCH_CLIENT_ID`, `SHARED_TMDB_API_KEY`): capitals, digits and `_`, so they also work as `${...}` variables in a compose file. See "Key naming standard" in Cove's DOCUMENTATION.md.
 
 ---
 
@@ -313,7 +313,7 @@ Use `errors.Is` with the sentinel errors:
 | `ErrBootstrapClosed` | `403` from the bootstrap endpoint (`bootstrap_locked`, `bootstrap_expired`, `bootstrap_forbidden`) |
 
 ```go
-value, err := c.GetSecret("myapp.api_key")
+value, err := c.GetSecret("MYAPP_TMDB_API_KEY")
 switch {
 case errors.Is(err, coveclient.ErrNotFound):
     // create it
@@ -405,7 +405,7 @@ A complete, runnable version is `examples/basic` (`COVE_URL=... go run ./example
 
 ### Project tokens
 
-Cove 1.0.0 can give each project its own token, limited to certain keys (`token create lighthouse --allow 'lighthouse.*'` in the Cove CLI). Nothing changes in your code: pass the project token wherever you passed `COVE_CLIENT_SECRET`, or let `LoadOrBootstrap` fetch it (`bootstrap open lighthouse` hands out Lighthouse's own token). Differences you may notice:
+Cove 1.0.0 can give each project its own token, limited to certain keys (`token create botsuite --allow 'BOTSUITE_*'` in the Cove CLI). Nothing changes in your code: pass the project token wherever you passed `COVE_CLIENT_SECRET`, or let `LoadOrBootstrap` fetch it (`bootstrap open lighthouse` hands out Lighthouse's own token). Differences you may notice:
 
 - A key outside the token's access fails with an error matching `ErrForbidden`, whether or not the key exists.
 - `GetAllSecrets` lists only the keys the token can read.

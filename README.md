@@ -53,7 +53,7 @@ if err := c.WaitForReady(ctx); err != nil {
 if _, err := c.LoadOrBootstrap("/data/cove-token"); err != nil {
     log.Fatal(err)
 }
-secrets, err := c.GetSecrets("my-app.db-url", "my-app.api-key")
+secrets, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
 if err != nil {
     log.Fatal(err) // names every missing key
 }
@@ -113,8 +113,8 @@ value, err := c.GetSecret("my-api-key")
 Returns several secrets, keyed by name, in **one request** (Cove's `POST /v0/batch`; an older Cove gets one request per key). All or nothing: if any are missing, the error names all of them and matches `ErrNotFound`; if the token can't read one, it matches `ErrForbidden` (Cove doesn't say which; its server log does).
 
 ```go
-s, err := c.GetSecrets("my-app.db-url", "my-app.api-key")
-dbURL := s["my-app.db-url"]
+s, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
+dbURL := s["MYAPP_DATABASE_URL"]
 ```
 
 ### `GetAllSecrets() ([]PublicSecretEntry, error)`

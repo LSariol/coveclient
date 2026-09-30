@@ -25,7 +25,7 @@ func Example() {
 		log.Fatal(err)
 	}
 
-	secrets, err := c.GetSecrets("myapp.db-url", "myapp.api-key")
+	secrets, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
 	if err != nil {
 		log.Fatal(err) // names every missing key
 	}
@@ -35,9 +35,9 @@ func Example() {
 func ExampleClient_GetSecret() {
 	c := coveclient.New("http://cove:2100", "your-token", "myapp")
 
-	value, err := c.GetSecret("myapp.api-key")
+	value, err := c.GetSecret("MYAPP_TMDB_API_KEY")
 	if errors.Is(err, coveclient.ErrNotFound) {
-		log.Fatal("add myapp.api-key in the Cove CLI: create myapp.api-key")
+		log.Fatal("add MYAPP_TMDB_API_KEY in the Cove CLI: create MYAPP_TMDB_API_KEY")
 	}
 	if err != nil {
 		log.Fatal(err)
@@ -48,7 +48,7 @@ func ExampleClient_GetSecret() {
 func ExampleAPIError() {
 	c := coveclient.New("http://cove:2100", "your-token", "myapp")
 
-	_, err := c.AddSecret("myapp.api-key", "value")
+	_, err := c.AddSecret("MYAPP_TMDB_API_KEY", "value")
 	var apiErr *coveclient.APIError
 	if errors.As(err, &apiErr) {
 		fmt.Println(apiErr.StatusCode, apiErr.Type, apiErr.Message)
@@ -56,7 +56,7 @@ func ExampleAPIError() {
 }
 
 func ExampleValidateKey() {
-	fmt.Println(coveclient.ValidateKey("myapp.api-key") == nil)
+	fmt.Println(coveclient.ValidateKey("MYAPP_TMDB_API_KEY") == nil)
 	fmt.Println(coveclient.ValidateKey("my app") == nil)
 	// Output:
 	// true

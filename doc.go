@@ -7,7 +7,7 @@
 //	if _, err := c.LoadOrBootstrap("/data/cove.token"); err != nil {
 //		log.Fatal(err)
 //	}
-//	secrets, err := c.GetSecrets("myapp.db-url", "myapp.api-key")
+//	secrets, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
 //
 // Every method has a ...Context version that takes a context.Context. Failed
 // requests return an *APIError, which matches ErrNotFound, ErrUnauthorized,

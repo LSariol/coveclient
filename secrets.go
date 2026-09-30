@@ -11,9 +11,9 @@ import (
 // GetSecrets returns the values of several secrets, keyed by name. It is
 // GetSecretsContext with context.Background().
 //
-//	s, err := c.GetSecrets("myapp.db-url", "myapp.api-key")
+//	s, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
 //	if err != nil { log.Fatal(err) }
-//	db := s["myapp.db-url"]
+//	db := s["MYAPP_DATABASE_URL"]
 func (c *Client) GetSecrets(keys ...string) (map[string]string, error) {
 	return c.GetSecretsContext(context.Background(), keys...)
 }

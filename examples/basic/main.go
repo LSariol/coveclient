@@ -2,7 +2,7 @@
 // values).
 //
 //	COVE_URL=http://cove:2100 COVE_TOKEN_FILE=./cove.token \
-//	    go run ./examples/basic myapp.db-url myapp.api-key
+//	    go run ./examples/basic MYAPP_DATABASE_URL MYAPP_TMDB_API_KEY
 //
 // The first run fetches the token from Cove's bootstrap endpoint (open it
 // first with `bootstrap open` in the Cove CLI) and saves it to COVE_TOKEN_FILE.
