@@ -4,6 +4,8 @@ A lightweight, dependency-free Go client for [Cove](https://github.com/LSariol/c
 
 > Full documentation (internals, deployment, error reference, known issues): [DOCUMENTATION.md](DOCUMENTATION.md)
 
+> **Who needs this library?** In the standard setup, Lighthouse injects each project's secrets as environment variables when it deploys it, so most projects don't use CoveClient at all. It's for **Lighthouse** itself and for **projects that change secrets** (e.g. botsuite refreshing tokens), which get `COVE_URL=http://cove:2100` and their own `COVE_TOKEN`. See "Connecting a project" in Cove's DOCUMENTATION.md.
+
 ## Features
 
 - Full CRUD operations on secrets, plus `GetSecrets` to fetch several at once

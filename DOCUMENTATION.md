@@ -6,6 +6,8 @@ The [README](README.md) is a quick overview. This document covers every method's
 
 For server-side behavior (routes, status codes, event log, bootstrap gate), see Cove's `DOCUMENTATION.md`.
 
+> **Who needs this library?** In the standard setup, Lighthouse injects each project's secrets as environment variables when it deploys it, so most projects don't use CoveClient at all. It's for **Lighthouse** itself and for **projects that change secrets** (e.g. botsuite refreshing tokens), which get `COVE_URL=http://cove:2100` and their own `COVE_TOKEN`. See "Connecting a project" in Cove's DOCUMENTATION.md.
+
 ---
 
 ## Contents
@@ -350,9 +352,11 @@ If the response body isn't Cove's JSON (for example an HTML error page from a pr
 
 ### Loading secrets at startup
 
+For a project that writes back (the others get their values injected and don't need this):
+
 ```go
 func loadConfig(ctx context.Context) (*Config, error) {
-    c := coveclient.New(os.Getenv("COVE_URL"), os.Getenv("COVE_CLIENT_SECRET"), "myapp")
+    c := coveclient.New(os.Getenv("COVE_URL"), os.Getenv("COVE_TOKEN"), "myapp")
 
     s, err := c.GetSecretsContext(ctx, "MYAPP_DATABASE_URL", "MYAPP_API_KEY")
     if err != nil {
