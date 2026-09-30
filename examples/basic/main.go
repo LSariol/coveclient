@@ -1,7 +1,7 @@
 // Command basic reads secrets from Cove and prints their lengths (never the
 // values).
 //
-//	COVE_URL=http://10.0.0.159:2100 COVE_TOKEN_FILE=./cove.token \
+//	COVE_URL=http://cove:2100 COVE_TOKEN_FILE=./cove.token \
 //	    go run ./examples/basic myapp.db-url myapp.api-key
 //
 // The first run fetches the token from Cove's bootstrap endpoint (open it
@@ -24,7 +24,7 @@ func main() {
 
 	baseURL := os.Getenv("COVE_URL")
 	if baseURL == "" {
-		log.Fatal("set COVE_URL, e.g. http://10.0.0.159:2100")
+		log.Fatal("set COVE_URL, e.g. http://cove:2100")
 	}
 	keys := os.Args[1:]
 	if len(keys) == 0 {

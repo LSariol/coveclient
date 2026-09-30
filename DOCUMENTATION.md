@@ -89,7 +89,7 @@ c := coveclient.New("http://cove:2100", clientSecret, "my-app")
 
 | Parameter | Meaning |
 |---|---|
-| `baseURL` | Scheme + host + port, e.g. `http://10.0.0.159:2100`. A trailing slash is ignored. |
+| `baseURL` | Scheme + host + port, e.g. `http://cove:2100`. A trailing slash is ignored. |
 | `clientSecret` | Cove's `COVE_CLIENT_SECRET`. Can be `""` if you'll call `LoadOrBootstrap`, or only `Health` / `Bootstrap`. |
 | `platformName` | Identifies your app in Cove's event log. It's **lowercased** by `New` and sent as `X-Cove-Source`. Use a stable name. If empty, the program's file name is used (e.g. `lighthouse`). |
 | `opts...` | Optional settings, below. |
@@ -396,8 +396,7 @@ A complete, runnable version is `examples/basic` (`COVE_URL=... go run ./example
 
 ### Network addressing
 
-- Same Docker network as Cove (`spark`): `http://cove:2100`
-- From the host: `http://localhost:2100`
+- **Prod: `http://cove:2100`, from a container on the `spark` Docker network.** Cove publishes no port, so this is the only way in; a project on another network must join `spark`.
 - Local dev Cove: `http://localhost:2110`
 
 ### Project tokens
