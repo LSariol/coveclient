@@ -31,6 +31,7 @@ type apiResponse struct {
 }
 
 type apiError struct {
-	Type    string `json:"type"`
-	Message string `json:"message"`
+	Type    string   `json:"type"`
+	Message string   `json:"message"`
+	Keys    []string `json:"keys"`
 }

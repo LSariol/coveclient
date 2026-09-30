@@ -34,6 +34,10 @@ type APIError struct {
 	StatusCode int    // the HTTP status Cove answered with
 	Type       string // Cove's error type, e.g. "not_found" (empty if Cove sent none)
 	Message    string // Cove's explanation (empty if Cove sent none)
+
+	// Keys lists the secret keys the error is about, when Cove says (e.g.
+	// the missing keys of GetSecrets).
+	Keys []string
 }
 
 // Error keeps the "Unexpected Status N" text of earlier versions, so code that
@@ -78,6 +82,7 @@ func newAPIError(method string, resp *http.Response) *APIError {
 	if json.NewDecoder(io.LimitReader(resp.Body, 64<<10)).Decode(&env) == nil && env.Error != nil {
 		e.Type = env.Error.Type
 		e.Message = env.Error.Message
+		e.Keys = env.Error.Keys
 	}
 	return e
 }

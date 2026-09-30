@@ -126,7 +126,7 @@ Every method except `LoadOrBootstrap` and `WaitForReady` has a `...Context` vers
 | `Auth()` | `GET /v0/auth` | ✓ | – | 200 | `error` |
 | `Bootstrap()` | `GET /v0/bootstrap/lighthouse` | – | – | 200 | `(string, error)` |
 | `GetSecret(key)` | `GET /v0/secrets/{key}` | ✓ | ✓ | 200 | `(string, error)` |
-| `GetSecrets(keys...)` | `GET /v0/secrets/{key}` for each key | ✓ | ✓ | 200 | `(map[string]string, error)` |
+| `GetSecrets(keys...)` | `POST /v0/batch` (up to 100 keys per request; one `GET` per key on an older Cove) | ✓ | ✓ | 200 | `(map[string]string, error)` |
 | `GetAllSecrets()` | `GET /v0/secrets` | ✓ | – | 200 | `([]PublicSecretEntry, error)` |
 | `AddSecret(key, value)` | `POST /v0/secrets/{key}` | ✓ | ✓ | **201** | `(string, error)` |
 | `UpdateSecret(key, value)` | `PATCH /v0/secrets/{key}` | ✓ | ✓ | 200 | `error` |
@@ -221,10 +221,10 @@ if err != nil {
 dbURL := s["myapp.database_url"]
 ```
 
-- If any are missing, the error names **all** of them and matches `ErrNotFound`, so one start-up tells you everything to add.
+- **One request** for all of them (`POST /v0/batch`). More than 100 keys are split into several requests. On a Cove without the batch endpoint, it falls back to one `GetSecret` per key.
+- **All or nothing.** If any are missing, the error names **all** of them and matches `ErrNotFound`, so one start-up tells you everything to add. If the token can't read one of them, the error matches `ErrForbidden`; Cove deliberately doesn't say which one (its server log does).
 - Every key is checked with `ValidateKey` before any request.
-- Any other failure (network, `401`, ...) stops at the first one.
-- It's one `GetSecret` per key, one after another, so each still counts as a read in Cove.
+- Each key still counts as a read in Cove.
 
 ### `GetAllSecrets() ([]PublicSecretEntry, error)`
 
@@ -490,6 +490,5 @@ Release process: update Cove first, then CoveClient, then tag CoveClient (`git t
 
 1. **Only `New` lowercases `Platform`.** If you set `c.Platform` directly, its case is kept.
 2. **The `/v0` prefix is written into each method's path**, so a Cove API bump means editing each one (and a new major version of this module).
-3. **`GetSecrets` is one request per key.** Cove has no batch endpoint yet, so fetching many secrets takes as many round trips.
-4. **`LoadOrBootstrap` and `WaitForReady` have no `...Context` twin for everything.** `WaitForReady` takes a context; `LoadOrBootstrap` doesn't, but each of its requests is bounded by the client's timeout.
-5. **Sentinel matching depends on Cove's status codes.** With Cove before 1.0.0, a duplicate `AddSecret` or an `UpdateSecret` on a missing key is a `500`, so `ErrAlreadyExists` / `ErrNotFound` don't match those.
+3. **`LoadOrBootstrap` and `WaitForReady` have no `...Context` twin for everything.** `WaitForReady` takes a context; `LoadOrBootstrap` doesn't, but each of its requests is bounded by the client's timeout.
+4. **Sentinel matching depends on Cove's status codes.** With Cove before 1.0.0, a duplicate `AddSecret` or an `UpdateSecret` on a missing key is a `500`, so `ErrAlreadyExists` / `ErrNotFound` don't match those.
