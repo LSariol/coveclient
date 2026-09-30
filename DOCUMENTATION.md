@@ -479,6 +479,7 @@ These must match Cove's server code. If you change either repo, check the other:
 | Secret list JSON fields | `SecretSummary` | `PublicSecretEntry` tags |
 | Request body `{"value"}` | `postSecret` / `patchSecret` | `secretPayload` |
 | `X-Cove-Source` requirement | `handleSecretID` | Set on `/v0/secrets/{key}` methods |
+| Batch read (`POST /v0/batch`, 100-key limit, `error.keys`) | `internal/server/batch.go` | `batch` and `maxBatchKeys` in `secrets.go`; `APIError.Keys` |
 
 Release process: update Cove first, then CoveClient, then tag CoveClient (`git tag vX.Y.Z && git push --tags`) and `go get` the new tag in each consuming project. From v1, a breaking change needs a new major version (`/v2` module path), so avoid them.
 
