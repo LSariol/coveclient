@@ -487,8 +487,6 @@ Release process: update Cove first, then CoveClient, then tag CoveClient (`git t
 
 ## 11. Known issues and gotchas
 
-> See [IMPROVEMENTS.md](IMPROVEMENTS.md) for ratings, proposed fixes, and what's been done.
-
 1. **Only `New` lowercases `Platform`.** If you set `c.Platform` directly, its case is kept.
 2. **The `/v0` prefix is written into each method's path**, so a Cove API bump means editing each one (and a new major version of this module).
 3. **`LoadOrBootstrap` and `WaitForReady` have no `...Context` twin for everything.** `WaitForReady` takes a context; `LoadOrBootstrap` doesn't, but each of its requests is bounded by the client's timeout.
