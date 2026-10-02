@@ -63,7 +63,7 @@ go get github.com/lsariol/coveclient@v1.0.0
 
 | CoveClient | Cove | Notes |
 |---|---|---|
-| v1.0.0 | `/v0/` API, any version with the JSON envelope | Current. Works with older Cove too (see below). |
+| v1.0.0 | v1.0.0 and later | Current. Needs Cove 1.0.0: upgrade Cove first, then the client. |
 | v0.2.0 | `/v0/` with JSON envelope | `New` takes 3 args. |
 | v0.1.x and earlier | Pre-v0 (no `/v0/` prefix, no envelope) | Incompatible with Cove v0.2.0 and later. |
 
@@ -192,7 +192,7 @@ dbURL, err := c.GetSecret("MYAPP_DATABASE_URL")
 ```
 
 - A missing key returns an error matching `ErrNotFound`.
-- If Cove answers with a different key than the one asked for, it's an error and no value is returned. (Cove before 1.0.0 may not send the key back; that's accepted.)
+- If Cove answers with a different key than the one asked for, it's an error and no value is returned.
 
 ### `GetSecrets(keys ...string) (map[string]string, error)`
 
@@ -217,11 +217,11 @@ Returns metadata for every secret, sorted by key. Values are never included. An 
 
 ### `AddSecret(key, value string) (string, error)`
 
-Creates a secret. Returns Cove's message, for example `"MYAPP_GITHUB_TOKEN has been created."`. If the key already exists, the error matches `ErrAlreadyExists` (Cove 1.0.0 and later; older Cove answers `500`).
+Creates a secret. Returns Cove's message, for example `"MYAPP_GITHUB_TOKEN has been created."`. If the key already exists, the error matches `ErrAlreadyExists`.
 
 ### `UpdateSecret(key, value string) error`
 
-Replaces the value and adds 1 to the version. If the key doesn't exist, the error matches `ErrNotFound` (Cove 1.0.0 and later; older Cove answers `500`).
+Replaces the value and adds 1 to the version. If the key doesn't exist, the error matches `ErrNotFound`.
 
 ### `DeleteSecret(key string) error`
 

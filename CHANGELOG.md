@@ -29,7 +29,7 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 
 ### Works with
 
-Cove v1.0.0, and still with Cove v0.2.0 (some errors have different statuses there).
+Cove v1.0.0 and later. It doesn't support Cove v0.2.0: upgrade Cove first, then the client.
 
 ## v0.2.0
 
