@@ -77,7 +77,7 @@ One code change may be needed: `Bootstrap()` and the `SecretValue` type are gone
 - **Keys are checked first.** A key with characters Cove doesn't allow fails with `ErrInvalidKey` without a request. Before, it either got a `400` from Cove or, for `?`, `#` or `../`, silently reached a different URL.
 - **An empty `platformName`** now uses the program's name instead of making every secret call fail.
 
-With a Cove server older than 1.0.0, everything works, but some errors have different statuses there (e.g. `AddSecret` on an existing key is a `500`, not a `409`), so `ErrAlreadyExists` won't match them.
+CoveClient 1.0.0 needs Cove 1.0.0 or later (it uses `/v0/ready` and `/v0/batch`, which older versions don't have). Upgrade Cove first, then the client.
 
 ---
 
@@ -470,4 +470,3 @@ Release process: update Cove first, then CoveClient, then tag CoveClient (`git t
 1. **Only `New` lowercases `Platform`.** If you set `c.Platform` directly, its case is kept.
 2. **The `/v0` prefix is written into each method's path**, so a Cove API bump means editing each one (and a new major version of this module).
 3. **`LoadOrBootstrap` and `WaitForReady` have no `...Context` twin for everything.** `WaitForReady` takes a context; `LoadOrBootstrap` doesn't, but each of its requests is bounded by the client's timeout.
-4. **Sentinel matching depends on Cove's status codes.** With Cove before 1.0.0, a duplicate `AddSecret` or an `UpdateSecret` on a missing key is a `500`, so `ErrAlreadyExists` / `ErrNotFound` don't match those.
