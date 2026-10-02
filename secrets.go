@@ -84,7 +84,7 @@ func (c *Client) batch(ctx context.Context, keys []string) (map[string]string, e
 		body: struct {
 			Keys []string `json:"keys"`
 		}{keys},
-		auth: true, source: true, want: http.StatusOK,
+		auth: true, want: http.StatusOK,
 	}, &data)
 
 	var apiErr *APIError

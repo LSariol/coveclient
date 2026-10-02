@@ -12,11 +12,11 @@ import (
 )
 
 func TestDefaultTimeout(t *testing.T) {
-	c := New("http://example", "tok", "test")
+	c := New("http://example", "tok")
 	if c.httpClient().Timeout != DefaultTimeout {
 		t.Fatalf("timeout = %v, want %v", c.httpClient().Timeout, DefaultTimeout)
 	}
-	if New("http://example", "tok", "test", WithTimeout(3*time.Second)).httpClient().Timeout != 3*time.Second {
+	if New("http://example", "tok", WithTimeout(3*time.Second)).httpClient().Timeout != 3*time.Second {
 		t.Fatal("WithTimeout wasn't applied")
 	}
 
@@ -36,7 +36,7 @@ func TestSlowServerTimesOut(t *testing.T) {
 	defer close(release)
 
 	start := time.Now()
-	_, err := New(ts.URL, "tok", "test", WithTimeout(200*time.Millisecond)).GetSecret("app.key")
+	_, err := New(ts.URL, "tok", WithTimeout(200*time.Millisecond)).GetSecret("app.key")
 	if err == nil {
 		t.Fatal("a server that never answers didn't time out")
 	}
@@ -57,7 +57,7 @@ func TestRedirectsAreNotFollowed(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	_, err := New(ts.URL, "tok", "test").AddSecret("app.key", "x")
+	_, err := New(ts.URL, "tok").AddSecret("app.key", "x")
 	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 301") {
 		t.Fatalf("AddSecret through a redirect = %v, want a 301 error", err)
 	}
@@ -77,7 +77,7 @@ func TestWithHTTPClient(t *testing.T) {
 		}, nil
 	})}
 
-	if ok, err := New("http://example", "", "test", WithHTTPClient(hc)).Health(); !ok || err != nil || !used {
+	if ok, err := New("http://example", "", WithHTTPClient(hc)).Health(); !ok || err != nil || !used {
 		t.Fatalf("Health through a custom client = %v, %v (used %v)", ok, err, used)
 	}
 }
@@ -91,7 +91,7 @@ func TestTrailingSlashInBaseURL(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if _, err := New(ts.URL+"/", "tok", "test").AddSecret("app.key", "x"); err != nil {
+	if _, err := New(ts.URL+"/", "tok").AddSecret("app.key", "x"); err != nil {
 		t.Fatal(err)
 	}
 	if method != "POST" || path != "/v0/secrets/app.key" {
@@ -99,23 +99,23 @@ func TestTrailingSlashInBaseURL(t *testing.T) {
 	}
 }
 
-func TestEmptyPlatformUsesProgramName(t *testing.T) {
-	var got string
+// Cove knows who is calling from the token alone, so the client sends nothing
+// else to identify itself.
+func TestOnlyTheTokenIdentifiesTheClient(t *testing.T) {
+	var auth string
+	var named bool
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		got = r.Header.Get("X-Cove-Source")
+		auth = r.Header.Get("Authorization")
+		_, named = r.Header["X-Cove-Source"]
 		io.WriteString(w, envelope(map[string]any{"key": "app.key", "action": "deleted"}))
 	}))
 	defer ts.Close()
 
-	if err := New(ts.URL, "tok", "").DeleteSecret("app.key"); err != nil {
+	if err := New(ts.URL, "tok").DeleteSecret("app.key"); err != nil {
 		t.Fatal(err)
 	}
-	if got == "" || got != programName() {
-		t.Fatalf("X-Cove-Source = %q, want the program name %q", got, programName())
-	}
-
-	if err := New(ts.URL, "tok", "MyApp").DeleteSecret("app.key"); err != nil || got != "myapp" {
-		t.Fatalf("X-Cove-Source = %q, %v; want myapp", got, err)
+	if auth != "Bearer tok" || named {
+		t.Fatalf("Authorization = %q, X-Cove-Source sent = %v", auth, named)
 	}
 }
 
@@ -130,7 +130,7 @@ func TestContextCancelsRequest(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
 
-	_, err := New(ts.URL, "tok", "test").GetSecretContext(ctx, "app.key")
+	_, err := New(ts.URL, "tok").GetSecretContext(ctx, "app.key")
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v, want context.DeadlineExceeded", err)
 	}

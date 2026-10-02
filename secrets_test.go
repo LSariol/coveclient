@@ -63,7 +63,7 @@ func startFake(t *testing.T, f *batchCove) *Client {
 	t.Helper()
 	ts := httptest.NewServer(f)
 	t.Cleanup(ts.Close)
-	return New(ts.URL, "tok", "test")
+	return New(ts.URL, "tok")
 }
 
 func TestGetSecretsUsesOneRequest(t *testing.T) {
@@ -134,7 +134,7 @@ func TestGetSecretsRejectsAnIncompleteAnswer(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if _, err := New(ts.URL, "tok", "test").GetSecrets("a", "b"); err == nil {
+	if _, err := New(ts.URL, "tok").GetSecrets("a", "b"); err == nil {
 		t.Fatal("an answer without b was accepted")
 	}
 }

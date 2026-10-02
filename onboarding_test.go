@@ -55,7 +55,7 @@ func TestLoadOrBootstrapFetchesSavesAndReuses(t *testing.T) {
 	ts := cove.server(t)
 	path := filepath.Join(t.TempDir(), "state", "cove-token")
 
-	c := New(ts.URL, "", "lighthouse")
+	c := New(ts.URL, "")
 	token, err := c.LoadOrBootstrap(path)
 	if err != nil {
 		t.Fatal(err)
@@ -80,7 +80,7 @@ func TestLoadOrBootstrapFetchesSavesAndReuses(t *testing.T) {
 	// A later start reads the file and doesn't call bootstrap again, even
 	// with the endpoint closed.
 	cove.open.Store(false)
-	again := New(ts.URL, "", "lighthouse")
+	again := New(ts.URL, "")
 	if token, err := again.LoadOrBootstrap(path); err != nil || token != cove.token {
 		t.Fatalf("second start = %q, %v", token, err)
 	}
@@ -94,7 +94,7 @@ func TestLoadOrBootstrapExplainsAClosedEndpoint(t *testing.T) {
 	ts := cove.server(t)
 	path := filepath.Join(t.TempDir(), "cove-token")
 
-	_, err := New(ts.URL, "", "lighthouse").LoadOrBootstrap(path)
+	_, err := New(ts.URL, "").LoadOrBootstrap(path)
 	if !errors.Is(err, ErrBootstrapClosed) {
 		t.Fatalf("err = %v, want ErrBootstrapClosed", err)
 	}
@@ -111,7 +111,7 @@ func TestLoadOrBootstrapRejectsAnEmptyFile(t *testing.T) {
 	if err := os.WriteFile(path, []byte("\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := New("http://unused", "", "lighthouse").LoadOrBootstrap(path); err == nil {
+	if _, err := New("http://unused", "").LoadOrBootstrap(path); err == nil {
 		t.Fatal("an empty token file was accepted")
 	}
 }
@@ -132,7 +132,7 @@ func TestWaitForReady(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	if err := New(ts.URL, "", "test").WaitForReady(ctx); err != nil {
+	if err := New(ts.URL, "").WaitForReady(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if n := calls.Load(); n != 3 {
@@ -148,7 +148,7 @@ func TestWaitForReadyGivesUp(t *testing.T) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 600*time.Millisecond)
 	defer cancel()
-	err := New(ts.URL, "", "test").WaitForReady(ctx)
+	err := New(ts.URL, "").WaitForReady(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("err = %v, want a deadline error", err)
 	}

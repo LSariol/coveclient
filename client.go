@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -22,7 +20,6 @@ const DefaultTimeout = 15 * time.Second
 type Client struct {
 	BaseURL      string // e.g. "http://cove:2100"
 	ClientSecret string // the token sent as "Authorization: Bearer ..."
-	Platform     string // your app's name, sent as X-Cove-Source
 
 	hc      *http.Client
 	timeout time.Duration
@@ -43,14 +40,14 @@ func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.hc = hc }
 }
 
-// New returns a Client for the Cove server at baseURL. platformName identifies
-// your app in Cove's event log (sent as X-Cove-Source) and is lowercased. If
-// it's empty, the program's name is used.
-func New(baseURL string, clientSecret string, platformName string, opts ...Option) *Client {
+// New returns a Client for the Cove server at baseURL. clientSecret is your
+// project's token (created with `token create` in the Cove CLI); Cove records
+// everything the client does under that token's name. Pass "" if the token
+// will come from LoadOrBootstrap.
+func New(baseURL string, clientSecret string, opts ...Option) *Client {
 	c := &Client{
 		BaseURL:      baseURL,
 		ClientSecret: clientSecret,
-		Platform:     strings.ToLower(platformName),
 		timeout:      DefaultTimeout,
 	}
 
@@ -93,26 +90,6 @@ func (c *Client) url(path string) string {
 	return strings.TrimRight(c.BaseURL, "/") + path
 }
 
-// source returns the name sent as X-Cove-Source. Cove refuses requests
-// without one, so an empty Platform falls back to the program's name.
-func (c *Client) source() string {
-	if p := strings.TrimSpace(c.Platform); p != "" {
-		return p
-	}
-	return programName()
-}
-
-// programName returns the running program's file name, lowercased and without
-// ".exe", e.g. "lighthouse".
-func programName() string {
-	name := strings.ToLower(filepath.Base(os.Args[0]))
-	name = strings.TrimSuffix(name, ".exe")
-	if name == "" || name == "." {
-		return "coveclient"
-	}
-	return name
-}
-
 // request describes one API call.
 type request struct {
 	name   string // the Client method, for error messages
@@ -120,7 +97,6 @@ type request struct {
 	path   string // e.g. "/v0/secrets/KEY"
 	body   any    // sent as JSON when not nil
 	auth   bool   // send the Authorization header
-	source bool   // send the X-Cove-Source header
 	want   int    // the status code that means success
 }
 
@@ -144,9 +120,6 @@ func (c *Client) do(ctx context.Context, r request, out any) error {
 	}
 	if r.auth {
 		req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
-	}
-	if r.source {
-		req.Header.Set("X-Cove-Source", c.source())
 	}
 
 	resp, err := c.httpClient().Do(req)
@@ -200,7 +173,7 @@ func (c *Client) GetSecretContext(ctx context.Context, key string) (string, erro
 	}
 	err = c.do(ctx, request{
 		name: "GetSecret", method: http.MethodGet, path: path,
-		auth: true, source: true, want: http.StatusOK,
+		auth: true, want: http.StatusOK,
 	}, &data)
 	if err != nil {
 		return "", err
@@ -256,7 +229,7 @@ func (c *Client) AddSecretContext(ctx context.Context, key string, value string)
 	}
 	err = c.do(ctx, request{
 		name: "AddSecret", method: http.MethodPost, path: path,
-		body: secretPayload{Value: value}, auth: true, source: true, want: http.StatusCreated,
+		body: secretPayload{Value: value}, auth: true, want: http.StatusCreated,
 	}, &data)
 	if err != nil {
 		return "", err
@@ -280,7 +253,7 @@ func (c *Client) UpdateSecretContext(ctx context.Context, key string, value stri
 
 	return c.do(ctx, request{
 		name: "UpdateSecret", method: http.MethodPatch, path: path,
-		body: secretPayload{Value: value}, auth: true, source: true, want: http.StatusOK,
+		body: secretPayload{Value: value}, auth: true, want: http.StatusOK,
 	}, nil)
 }
 
@@ -301,7 +274,7 @@ func (c *Client) DeleteSecretContext(ctx context.Context, key string) error {
 
 	return c.do(ctx, request{
 		name: "DeleteSecret", method: http.MethodDelete, path: path,
-		auth: true, source: true, want: http.StatusOK,
+		auth: true, want: http.StatusOK,
 	}, nil)
 }
 

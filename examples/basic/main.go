@@ -31,7 +31,7 @@ func main() {
 		log.Fatal("usage: basic KEY [KEY...]")
 	}
 
-	c := coveclient.New(baseURL, os.Getenv("COVE_TOKEN"), "coveclient-example")
+	c := coveclient.New(baseURL, os.Getenv("COVE_TOKEN"))
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

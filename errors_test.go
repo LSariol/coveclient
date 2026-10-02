@@ -21,7 +21,7 @@ func TestErrorsIncludeCovesExplanation(t *testing.T) {
 	ts := coveError(http.StatusNotFound, "not_found", "secret not found")
 	defer ts.Close()
 
-	_, err := New(ts.URL, "tok", "test").GetSecret("app.key")
+	_, err := New(ts.URL, "tok").GetSecret("app.key")
 	want := "coveClient: GetSecret: Unexpected Status 404: not_found: secret not found"
 	if err == nil || err.Error() != want {
 		t.Fatalf("err = %v, want %q", err, want)
@@ -70,7 +70,7 @@ func TestErrorWithoutCoveBody(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	err := New(ts.URL, "tok", "test").Auth()
+	err := New(ts.URL, "tok").Auth()
 	if err == nil || err.Error() != "coveClient: Auth: Unexpected Status 502" {
 		t.Fatalf("err = %v", err)
 	}

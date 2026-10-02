@@ -13,7 +13,7 @@ import (
 // A typical start-up: wait for Cove, get the token (the first run fetches and
 // saves it), then read the secrets the program needs.
 func Example() {
-	c := coveclient.New("http://cove:2100", "", "myapp")
+	c := coveclient.New("http://cove:2100", "")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
@@ -33,7 +33,7 @@ func Example() {
 }
 
 func ExampleClient_GetSecret() {
-	c := coveclient.New("http://cove:2100", "your-token", "myapp")
+	c := coveclient.New("http://cove:2100", "your-token")
 
 	value, err := c.GetSecret("MYAPP_TMDB_API_KEY")
 	if errors.Is(err, coveclient.ErrNotFound) {
@@ -46,7 +46,7 @@ func ExampleClient_GetSecret() {
 }
 
 func ExampleAPIError() {
-	c := coveclient.New("http://cove:2100", "your-token", "myapp")
+	c := coveclient.New("http://cove:2100", "your-token")
 
 	_, err := c.AddSecret("MYAPP_TMDB_API_KEY", "value")
 	var apiErr *coveclient.APIError

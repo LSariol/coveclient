@@ -30,7 +30,7 @@ func TestKeysThatWouldChangeTheURLAreRefused(t *testing.T) {
 		requests++
 	}))
 	defer ts.Close()
-	c := New(ts.URL, "tok", "test")
+	c := New(ts.URL, "tok")
 
 	for _, key := range []string{"foo?x=1", "foo#bar", "../auth"} {
 		if _, err := c.GetSecret(key); !errors.Is(err, ErrInvalidKey) {
@@ -57,7 +57,7 @@ func TestGetSecretChecksTheReturnedKey(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	value, err := New(ts.URL, "tok", "test").GetSecret("app.key")
+	value, err := New(ts.URL, "tok").GetSecret("app.key")
 	if err == nil || value != "" {
 		t.Fatalf("GetSecret = %q, %v; want an error and no value", value, err)
 	}

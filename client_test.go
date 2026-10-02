@@ -12,7 +12,7 @@ import (
 )
 
 func newTestClient(ts *httptest.Server, secret string) *Client {
-	return New(ts.URL, secret, "test")
+	return New(ts.URL, secret)
 }
 
 type roundTripperFunc func(*http.Request) (*http.Response, error)
@@ -25,11 +25,11 @@ func envelope(data interface{}) string {
 }
 
 func TestNewClient(t *testing.T) {
-	c := New("http://example", "tok", "myapp")
+	c := New("http://example", "tok")
 	if c == nil {
 		t.Fatalf("New returned nil")
 	}
-	if c.BaseURL != "http://example" || c.ClientSecret != "tok" || c.Platform != "myapp" {
+	if c.BaseURL != "http://example" || c.ClientSecret != "tok" {
 		t.Fatalf("unexpected client fields: %+v", c)
 	}
 }
@@ -47,9 +47,6 @@ func TestGetSecret_Success(t *testing.T) {
 		}
 		if got := r.Header.Get("Authorization"); got != wantAuth {
 			t.Fatalf("Authorization = %q, want %q", got, wantAuth)
-		}
-		if got := r.Header.Get("X-Cove-Source"); got != "test" {
-			t.Fatalf("X-Cove-Source = %q, want %q", got, "test")
 		}
 		w.Header().Set("Content-Type", "application/json")
 		io.WriteString(w, envelope(map[string]interface{}{"key": "alpha", "value": "shh", "version": 1}))
@@ -97,7 +94,7 @@ func TestGetSecret_BadJSON(t *testing.T) {
 }
 
 func TestGetSecret_RequestBuildError(t *testing.T) {
-	c := &Client{BaseURL: "http://%", ClientSecret: "tok", Platform: "test"}
+	c := &Client{BaseURL: "http://%", ClientSecret: "tok"}
 	_, err := c.GetSecret("id")
 	if err == nil {
 		t.Fatalf("expected request build error")
@@ -191,9 +188,6 @@ func TestAddSecret_Success(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
 			t.Fatalf("Authorization = %q", got)
 		}
-		if got := r.Header.Get("X-Cove-Source"); got != "test" {
-			t.Fatalf("X-Cove-Source = %q, want test", got)
-		}
 		var p secretPayload
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 			t.Fatalf("decode payload: %v", err)
@@ -256,9 +250,6 @@ func TestUpdateSecret_Success(t *testing.T) {
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
 			t.Fatalf("Authorization = %q", got)
 		}
-		if got := r.Header.Get("X-Cove-Source"); got != "test" {
-			t.Fatalf("X-Cove-Source = %q, want test", got)
-		}
 		var p secretPayload
 		if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
 			t.Fatalf("decode payload: %v", err)
@@ -302,9 +293,6 @@ func TestDeleteSecret_Success(t *testing.T) {
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer tok" {
 			t.Fatalf("Authorization = %q", got)
-		}
-		if got := r.Header.Get("X-Cove-Source"); got != "test" {
-			t.Fatalf("X-Cove-Source = %q, want test", got)
 		}
 		w.WriteHeader(http.StatusOK)
 		io.WriteString(w, envelope(map[string]interface{}{"key": wantID, "action": "deleted", "message": "deleted"}))
@@ -403,7 +391,7 @@ func TestHTTPDoError_Propagates(t *testing.T) {
 	failing := &http.Client{Transport: roundTripperFunc(func(r *http.Request) (*http.Response, error) {
 		return nil, errors.New("boom")
 	})}
-	c := New("http://example", "tok", "test", WithHTTPClient(failing))
+	c := New("http://example", "tok", WithHTTPClient(failing))
 
 	if _, err := c.GetSecret("id"); err == nil || !strings.Contains(err.Error(), "boom") {
 		t.Fatalf("GetSecret should propagate transport error, got %v", err)

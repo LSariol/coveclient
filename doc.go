@@ -3,7 +3,7 @@
 // Create a Client with New, get its token with LoadOrBootstrap (or pass one
 // you already have), then read secrets:
 //
-//	c := coveclient.New("http://cove:2100", "", "myapp")
+//	c := coveclient.New("http://cove:2100", "")
 //	if _, err := c.LoadOrBootstrap("/data/cove.token"); err != nil {
 //		log.Fatal(err)
 //	}
