@@ -31,7 +31,7 @@ For server-side behavior (routes, status codes, event log, bootstrap gate), see 
 CoveClient wraps Cove's HTTP API in a small Go API. It:
 
 - checks keys and builds the `/v0/...` URLs,
-- sets `Authorization: Bearer <secret>` and `X-Cove-Source: <platform>`,
+- sets `Authorization: Bearer <token>`,
 - sends requests with its own `http.Client` (15-second timeout, no redirects),
 - decodes Cove's `{"success", "data" | "error"}` response envelope,
 - returns plain Go values (`string`, `bool`, `map[string]string`, `[]PublicSecretEntry`), and errors you can check with `errors.Is`.
@@ -69,13 +69,14 @@ go get github.com/lsariol/coveclient@v1.0.0
 
 ### Upgrading from v0.2.0
 
-One code change may be needed: `Bootstrap()` and the `SecretValue` type are gone, so replace a `Bootstrap()` call with `LoadOrBootstrap(path)`, which also saves the token and sets it on the client. Every other v0.2.0 call compiles and works the same way. What changes:
+Two code changes are needed. `New` takes two arguments (see below). And `Bootstrap()` and the `SecretValue` type are gone, so replace a `Bootstrap()` call with `LoadOrBootstrap(path)`, which also saves the token and sets it on the client. Every other v0.2.0 call compiles and works the same way. What changes:
 
 - **Timeouts.** Requests fail after 15 seconds instead of waiting forever. Change it with `WithTimeout`.
 - **`http.DefaultClient` is no longer used.** If you set `http.DefaultClient.Timeout` (or its `Transport`) for CoveClient's sake, it no longer has any effect; pass `WithTimeout` or `WithHTTPClient` to `New` instead.
 - **Error text is longer.** `Unexpected Status 404` becomes `Unexpected Status 404: not_found: secret not found`. Code that checks `strings.Contains(err.Error(), "Unexpected Status 404")` still works, but `errors.Is(err, coveclient.ErrNotFound)` is better.
 - **Keys are checked first.** A key with characters Cove doesn't allow fails with `ErrInvalidKey` without a request. Before, it either got a `400` from Cove or, for `?`, `#` or `../`, silently reached a different URL.
-- **An empty `platformName`** now uses the program's name instead of making every secret call fail.
+- **`New` takes two arguments,** `New(baseURL, token)`: the platform name is gone, because Cove records a request under its token's name. The `Client.ClientSecret` field is now `Client.Token`, and `Client.Platform` is gone.
+- **Every client needs a project token** (`token create` in the Cove CLI). Cove 1.0.0 has no shared master token.
 
 CoveClient 1.0.0 needs Cove 1.0.0 or later (it uses `/v0/ready` and `/v0/batch`, which older versions don't have). Upgrade Cove first, then the client.
 
@@ -86,14 +87,13 @@ CoveClient 1.0.0 needs Cove 1.0.0 or later (it uses `/v0/ready` and `/v0/batch`,
 ```go
 import "github.com/lsariol/coveclient"
 
-c := coveclient.New("http://cove:2100", clientSecret, "my-app")
+c := coveclient.New("http://cove:2100", token)
 ```
 
 | Parameter | Meaning |
 |---|---|
 | `baseURL` | Scheme + host + port, e.g. `http://cove:2100`. A trailing slash is ignored. |
-| `clientSecret` | Cove's `COVE_CLIENT_SECRET`. Can be `""` if you'll call `LoadOrBootstrap`, or only `Health`. |
-| `platformName` | Identifies your app in Cove's event log. It's **lowercased** by `New` and sent as `X-Cove-Source`. Use a stable name. If empty, the program's file name is used (e.g. `lighthouse`). |
+| `token` | Your project's token, from `token create` in the Cove CLI. Cove records what the client does under the token's name. Can be `""` if you'll call `LoadOrBootstrap`, or only `Health`. |
 | `opts...` | Optional settings, below. |
 
 | Option | Effect |
@@ -101,18 +101,17 @@ c := coveclient.New("http://cove:2100", clientSecret, "my-app")
 | `WithTimeout(d)` | How long a request may take before it fails. Default `DefaultTimeout` (15s). |
 | `WithHTTPClient(hc)` | Send requests with your own `*http.Client` (proxy, custom TLS, tracing). Its own timeout and redirect settings apply instead of CoveClient's. |
 
-`Client` has exported fields, so you can change them after construction (for example, `LoadOrBootstrap` sets `ClientSecret`):
+`Client` has exported fields, so you can change them after construction (for example, `LoadOrBootstrap` sets `Token`):
 
 ```go
 type Client struct {
-    BaseURL      string
-    ClientSecret string
-    Platform     string // already lowercased if set via New
+    BaseURL string
+    Token   string
     // unexported: the http.Client and timeout
 }
 ```
 
-`New` is the only place that lowercases `Platform`. If you set the field directly, the value is sent unchanged. A `Client` built as a struct literal instead of with `New` still gets the default timeout. `Client` is safe to use from multiple goroutines as long as you don't change its fields at the same time.
+A `Client` built as a struct literal instead of with `New` still gets the default timeout. `Client` is safe to use from multiple goroutines as long as you don't change its fields at the same time.
 
 ---
 
@@ -120,18 +119,18 @@ type Client struct {
 
 Every method except `LoadOrBootstrap` and `WaitForReady` has a `...Context` version that takes a `context.Context` first (`GetSecretContext(ctx, key)`, `AuthContext(ctx)`, ...). Use it to cancel a request or give it a deadline. The plain versions call it with `context.Background()`; the client's timeout applies either way.
 
-| Method | HTTP | Auth | `X-Cove-Source` | Expected status | Returns |
-|---|---|---|---|---|---|
-| `Health()` | `GET /v0/health` | – | – | 200 | `(bool, error)` |
-| `Auth()` | `GET /v0/auth` | ✓ | – | 200 | `error` |
-| `GetSecret(key)` | `GET /v0/secrets/{key}` | ✓ | ✓ | 200 | `(string, error)` |
-| `GetSecrets(keys...)` | `POST /v0/batch` (up to 100 keys per request) | ✓ | ✓ | 200 | `(map[string]string, error)` |
-| `GetAllSecrets()` | `GET /v0/secrets` | ✓ | – | 200 | `([]PublicSecretEntry, error)` |
-| `AddSecret(key, value)` | `POST /v0/secrets/{key}` | ✓ | ✓ | **201** | `(string, error)` |
-| `UpdateSecret(key, value)` | `PATCH /v0/secrets/{key}` | ✓ | ✓ | 200 | `error` |
-| `DeleteSecret(key)` | `DELETE /v0/secrets/{key}` | ✓ | ✓ | 200 | `error` |
-| `LoadOrBootstrap(path)` | reads `path`, or `GET /v0/bootstrap/lighthouse` then `GET /v0/auth` | – | – | 200 | `(string, error)` |
-| `WaitForReady(ctx)` | `GET /v0/ready`, repeated | – | – | 200 | `error` |
+| Method | HTTP | Auth | Expected status | Returns |
+|---|---|---|---|---|
+| `Health()` | `GET /v0/health` | – | 200 | `(bool, error)` |
+| `Auth()` | `GET /v0/auth` | ✓ | 200 | `error` |
+| `GetSecret(key)` | `GET /v0/secrets/{key}` | ✓ | 200 | `(string, error)` |
+| `GetSecrets(keys...)` | `POST /v0/batch` (up to 100 keys per request) | ✓ | 200 | `(map[string]string, error)` |
+| `GetAllSecrets()` | `GET /v0/secrets` | ✓ | 200 | `([]PublicSecretEntry, error)` |
+| `AddSecret(key, value)` | `POST /v0/secrets/{key}` | ✓ | **201** | `(string, error)` |
+| `UpdateSecret(key, value)` | `PATCH /v0/secrets/{key}` | ✓ | 200 | `error` |
+| `DeleteSecret(key)` | `DELETE /v0/secrets/{key}` | ✓ | 200 | `error` |
+| `LoadOrBootstrap(path)` | reads `path`, or `GET /v0/bootstrap/lighthouse` then `GET /v0/auth` | – | 200 | `(string, error)` |
+| `WaitForReady(ctx)` | `GET /v0/ready`, repeated | – | 200 | `error` |
 
 ### `Health() (bool, error)`
 
@@ -145,7 +144,7 @@ Returns `(true, nil)` when healthy. On any failure it returns `(false, err)`.
 
 ### `Auth() error`
 
-Checks that `ClientSecret` is accepted. Returns `nil` on success. A wrong token returns an error matching `ErrUnauthorized`:
+Checks that `Token` is accepted. Returns `nil` on success. A wrong token returns an error matching `ErrUnauthorized`:
 
 ```
 coveClient: Auth: Unexpected Status 401: invalid_token: the provided token is invalid
@@ -153,10 +152,10 @@ coveClient: Auth: Unexpected Status 401: invalid_token: the provided token is in
 
 ### `LoadOrBootstrap(path string) (string, error)`
 
-Gets this client's token and sets `c.ClientSecret`. Call it on every start:
+Gets this client's token and sets `c.Token`. Call it on every start:
 
 ```go
-c := coveclient.New("http://cove:2100", "", "lighthouse")
+c := coveclient.New("http://cove:2100", "")
 token, err := c.LoadOrBootstrap("/data/cove-token")
 if errors.Is(err, coveclient.ErrBootstrapClosed) {
     log.Fatal("Run `bootstrap open` in the Cove CLI, then restart: ", err)
@@ -185,7 +184,7 @@ It uses `/v0/ready`, which also checks Cove's database.
 
 ### `GetSecret(key string) (string, error)`
 
-Returns the decrypted value. Each call adds 1 to the secret's `times_pulled` on the server and writes a `read` event tagged with your platform name.
+Returns the decrypted value. Each call adds 1 to the secret's `times_pulled` on the server and writes a `read` event under your token's name.
 
 ```go
 dbURL, err := c.GetSecret("MYAPP_DATABASE_URL")
@@ -317,8 +316,8 @@ If the response body isn't Cove's JSON (for example an HTML error page from a pr
 
 | Status | Likely cause |
 |---|---|
-| 400 | Invalid key (normally caught before sending), missing `X-Cove-Source`, bad body |
-| 401 | Wrong/empty `ClientSecret`, or Cove hasn't loaded its secret yet |
+| 400 | Invalid key (normally caught before sending), bad body |
+| 401 | Wrong or empty `Token`, or the token was rotated or revoked |
 | 403 | A project token that doesn't cover the key (`forbidden_key`), or the bootstrap endpoint is closed, expired, or not allowed from this address |
 | 404 | No secret with that key |
 | 405 | Method not allowed. Shouldn't happen unless routes drift. |
@@ -336,7 +335,7 @@ For a project that writes back (the others get their values injected and don't n
 
 ```go
 func loadConfig(ctx context.Context) (*Config, error) {
-    c := coveclient.New(os.Getenv("COVE_URL"), os.Getenv("COVE_TOKEN"), "myapp")
+    c := coveclient.New(os.Getenv("COVE_URL"), os.Getenv("COVE_TOKEN"))
 
     s, err := c.GetSecretsContext(ctx, "MYAPP_DATABASE_URL", "MYAPP_API_KEY")
     if err != nil {
@@ -365,7 +364,7 @@ Or in compose, use `depends_on: { cove: { condition: service_healthy } }`, since
 ### First-boot bootstrap
 
 ```go
-c := coveclient.New(coveURL, "", "lighthouse")
+c := coveclient.New(coveURL, "")
 if err := c.WaitForReady(ctx); err != nil {
     return err
 }
@@ -385,15 +384,15 @@ A complete, runnable version is `examples/basic` (`COVE_URL=... go run ./example
 
 ### Project tokens
 
-Cove 1.0.0 can give each project its own token, limited to certain keys (`token create botsuite --allow 'BOTSUITE_*'` in the Cove CLI). Nothing changes in your code: pass the project token wherever you passed `COVE_CLIENT_SECRET`, or let `LoadOrBootstrap` fetch it (`bootstrap open lighthouse` hands out Lighthouse's own token). Differences you may notice:
+Every client has its own token, limited to certain keys (`token create botsuite --allow 'BOTSUITE_*'` in the Cove CLI). Pass it to `New`, or let `LoadOrBootstrap` fetch it (`bootstrap open lighthouse` hands out Lighthouse's own token). What that means for your code:
 
 - A key outside the token's access fails with an error matching `ErrForbidden`, whether or not the key exists.
 - `GetAllSecrets` lists only the keys the token can read.
-- Cove's event log records the token's name as the source; `platformName` is ignored.
+- Cove's event log records the token's name as the source.
 
-### Handling the client secret
+### Handling the token
 
-Keep `COVE_CLIENT_SECRET` in the consuming app's environment, `.env` file, or a `LoadOrBootstrap` token file. Never hard-code it or commit it. Everyone who has it gets full read/write access to every secret in Cove.
+Keep the token in the consuming app's environment (injected by Lighthouse as `COVE_TOKEN`), or a `LoadOrBootstrap` token file. Never hard-code it or commit it. Everyone who has it can do what that project can. If it leaks: `token rotate <project>` in the Cove CLI.
 
 ---
 
@@ -405,7 +404,7 @@ Every method builds a `request` (name, method, path, body, which headers, expect
 secretPath(key)                         → ValidateKey, then "/v0/secrets/" + url.PathEscape(key)
 do(ctx, request, &out)
   → http.NewRequestWithContext(ctx, method, c.url(path), body)   // c.url trims a trailing "/"
-  → set Content-Type / Authorization / X-Cove-Source (c.source(): Platform or the program name)
+  → set Content-Type / Authorization
   → c.httpClient().Do(req)                                       // own client: timeout, no redirects
   → if resp.StatusCode != want → newAPIError(name, resp)         // reads Cove's error envelope
   → decodeEnvelope(resp, &out)
@@ -433,7 +432,7 @@ go test ./...
 
 - Tests are `package coveclient`, so they can reach unexported code. `example_test.go` is `package coveclient_test` and shows the public API as a user sees it; `ExampleValidateKey` checks its output, the others only compile.
 - Each test starts an `httptest.NewServer` that checks the request and returns a canned response.
-- Helpers: `newTestClient(ts, secret)` creates a client with platform `"test"`. `envelope(data)` builds `{"success":true,"data":...}`. `coveError(status, type, message)` answers like a failing Cove.
+- Helpers: `newTestClient(ts, token)` creates a client for a test server. `envelope(data)` builds `{"success":true,"data":...}`. `coveError(status, type, message)` answers like a failing Cove.
 - No test changes global state, so tests can run in parallel.
 - CI (`.github/workflows/ci.yml`) runs gofmt, `go vet` and `go test -race` on Go 1.21 and the latest Go.
 
@@ -458,7 +457,6 @@ These must match Cove's server code. If you change either repo, check the other:
 | Key rules | `internal/vault/keys.go` | `ValidateKey` in `keys.go` |
 | Secret list JSON fields | `SecretSummary` | `PublicSecretEntry` tags |
 | Request body `{"value"}` | `postSecret` / `patchSecret` | `secretPayload` |
-| `X-Cove-Source` requirement | `handleSecretID` | Set on `/v0/secrets/{key}` methods |
 | Batch read (`POST /v0/batch`, 100-key limit, `error.keys`) | `internal/server/batch.go` | `batch` and `maxBatchKeys` in `secrets.go`; `APIError.Keys` |
 
 Release process: update Cove first, then CoveClient, then tag CoveClient (`git tag vX.Y.Z && git push --tags`) and `go get` the new tag in each consuming project. From v1, a breaking change needs a new major version (`/v2` module path), so avoid them.
@@ -467,6 +465,5 @@ Release process: update Cove first, then CoveClient, then tag CoveClient (`git t
 
 ## 11. Known issues and gotchas
 
-1. **Only `New` lowercases `Platform`.** If you set `c.Platform` directly, its case is kept.
-2. **The `/v0` prefix is written into each method's path**, so a Cove API bump means editing each one (and a new major version of this module).
-3. **`LoadOrBootstrap` and `WaitForReady` have no `...Context` twin for everything.** `WaitForReady` takes a context; `LoadOrBootstrap` doesn't, but each of its requests is bounded by the client's timeout.
+1. **The `/v0` prefix is written into each method's path**, so a Cove API bump means editing each one (and a new major version of this module).
+2. **`LoadOrBootstrap` and `WaitForReady` have no `...Context` twin for everything.** `WaitForReady` takes a context; `LoadOrBootstrap` doesn't, but each of its requests is bounded by the client's timeout.

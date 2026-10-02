@@ -4,7 +4,7 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 
 ## v1.0.0
 
-**One code change may be needed to upgrade from v0.2.0:** `Bootstrap()` is gone (see Removed). What behaves differently is listed first; see [DOCUMENTATION.md](DOCUMENTATION.md#upgrading-from-v020).
+**Upgrading from v0.2.0 needs small code changes:** `New` takes two arguments, and `Bootstrap()` is gone (see Removed). It also needs Cove v1.0.0 and a project token. What behaves differently is listed first; see [DOCUMENTATION.md](DOCUMENTATION.md#upgrading-from-v020).
 
 ### Behaviour changes
 
@@ -12,7 +12,6 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 - The client uses its own `http.Client`: settings made on `http.DefaultClient` no longer apply (use `WithHTTPClient`). Redirects aren't followed.
 - Error text keeps `Unexpected Status N` and adds Cove's explanation after it: `... Unexpected Status 404: not_found: secret not found`.
 - Keys are checked before anything is sent; `?`, `#` or `../` in a key can no longer reach a different URL.
-- An empty platform name uses the program's name instead of failing every call.
 
 ### Added
 
@@ -26,6 +25,8 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 ### Removed
 
 - `Bootstrap()` and the `SecretValue` type. Use `LoadOrBootstrap(path)`, which also saves the token and sets it on the client.
+- The platform name: `New(baseURL, token)` replaces `New(baseURL, clientSecret, platformName)`, and `Client.Platform` is gone. Cove 1.0 records a request under its token's name, so `X-Cove-Source` is no longer sent.
+- `Client.ClientSecret` is now `Client.Token`.
 
 ### Works with
 

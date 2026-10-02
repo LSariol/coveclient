@@ -12,7 +12,6 @@ A lightweight, dependency-free Go client for [Cove](https://github.com/LSariol/c
 - One-call onboarding (`LoadOrBootstrap`) and start-up waiting (`WaitForReady`)
 - Errors that say what went wrong, and that you can check with `errors.Is`
 - A 15-second request timeout by default; every method has a `...Context` version
-- Sends `X-Cove-Source` for per-request audit logging
 - Zero external dependencies; Go 1.21+
 
 ## Installation
@@ -26,12 +25,10 @@ go get github.com/lsariol/coveclient
 ```go
 import "github.com/lsariol/coveclient"
 
-c := coveclient.New("http://cove.internal:2100", "<COVE_CLIENT_SECRET>", "my-app")
+c := coveclient.New("http://cove:2100", os.Getenv("COVE_TOKEN"))
 ```
 
-The token can be Cove's master token or a **project token** made with `token create` in the Cove CLI, which only reaches the keys it was given. The client works the same with either.
-
-The third argument (`platformName`) is sent as the `X-Cove-Source` header on every secret operation and is recorded in Cove's event log. If it's empty, the program's name is used. (With a project token, Cove records the token's name instead.)
+The token is a **project token** made with `token create` in the Cove CLI. It only reaches the keys it was given, and Cove records everything the client does under the token's name. Pass `""` if the token will come from `LoadOrBootstrap`.
 
 Options go after it:
 
@@ -75,7 +72,7 @@ healthy, err := c.Health()
 ```
 
 ### `Auth() error`
-Authenticated. Returns `nil` if the client secret is valid.
+Authenticated. Returns `nil` if the token is valid.
 
 ```go
 err := c.Auth()
