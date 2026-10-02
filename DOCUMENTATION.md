@@ -46,7 +46,7 @@ It has **no dependencies** outside the standard library.
 | `keys.go` | `ValidateKey`, `ErrInvalidKey`, and building a secret's path |
 | `errors.go` | `APIError` and the sentinel errors |
 | `onboarding.go` | `LoadOrBootstrap`, `WaitForReady`, `ErrBootstrapClosed` |
-| `models.go` | `PublicSecretEntry`, `SecretValue`, and the unexported envelope/payload types |
+| `models.go` | `PublicSecretEntry` and the unexported envelope/payload types |
 | `*_test.go` | `httptest`-based unit tests; `example_test.go` holds the examples shown in the docs |
 | `examples/basic/` | A small program that reads secrets using settings from environment variables |
 
@@ -69,7 +69,7 @@ go get github.com/lsariol/coveclient@v1.0.0
 
 ### Upgrading from v0.2.0
 
-No code changes are needed: every v0.2.0 call compiles and works the same way. What changes:
+One code change may be needed: `Bootstrap()` and the `SecretValue` type are gone, so replace a `Bootstrap()` call with `LoadOrBootstrap(path)`, which also saves the token and sets it on the client. Every other v0.2.0 call compiles and works the same way. What changes:
 
 - **Timeouts.** Requests fail after 15 seconds instead of waiting forever. Change it with `WithTimeout`.
 - **`http.DefaultClient` is no longer used.** If you set `http.DefaultClient.Timeout` (or its `Transport`) for CoveClient's sake, it no longer has any effect; pass `WithTimeout` or `WithHTTPClient` to `New` instead.
@@ -92,7 +92,7 @@ c := coveclient.New("http://cove:2100", clientSecret, "my-app")
 | Parameter | Meaning |
 |---|---|
 | `baseURL` | Scheme + host + port, e.g. `http://cove:2100`. A trailing slash is ignored. |
-| `clientSecret` | Cove's `COVE_CLIENT_SECRET`. Can be `""` if you'll call `LoadOrBootstrap`, or only `Health` / `Bootstrap`. |
+| `clientSecret` | Cove's `COVE_CLIENT_SECRET`. Can be `""` if you'll call `LoadOrBootstrap`, or only `Health`. |
 | `platformName` | Identifies your app in Cove's event log. It's **lowercased** by `New` and sent as `X-Cove-Source`. Use a stable name. If empty, the program's file name is used (e.g. `lighthouse`). |
 | `opts...` | Optional settings, below. |
 
@@ -124,7 +124,6 @@ Every method except `LoadOrBootstrap` and `WaitForReady` has a `...Context` vers
 |---|---|---|---|---|---|
 | `Health()` | `GET /v0/health` | – | – | 200 | `(bool, error)` |
 | `Auth()` | `GET /v0/auth` | ✓ | – | 200 | `error` |
-| `Bootstrap()` | `GET /v0/bootstrap/lighthouse` | – | – | 200 | `(string, error)` |
 | `GetSecret(key)` | `GET /v0/secrets/{key}` | ✓ | ✓ | 200 | `(string, error)` |
 | `GetSecrets(keys...)` | `POST /v0/batch` (up to 100 keys per request; one `GET` per key on an older Cove) | ✓ | ✓ | 200 | `(map[string]string, error)` |
 | `GetAllSecrets()` | `GET /v0/secrets` | ✓ | – | 200 | `([]PublicSecretEntry, error)` |
@@ -151,20 +150,6 @@ Checks that `ClientSecret` is accepted. Returns `nil` on success. A wrong token 
 ```
 coveClient: Auth: Unexpected Status 401: invalid_token: the provided token is invalid
 ```
-
-### `Bootstrap() (string, error)`
-
-Gets `COVE_CLIENT_SECRET` from Cove's bootstrap endpoint. It needs no credentials.
-
-```go
-secret, err := c.Bootstrap()
-if err == nil {
-    c.ClientSecret = secret
-}
-```
-
-- It only works while someone has opened the endpoint with `bootstrap open` in the Cove CLI (for 10 minutes by default, and closed again after one handout). Otherwise the error matches `ErrBootstrapClosed` and includes Cove's reason.
-- It does **not** set `c.ClientSecret` or save the token for you. **Prefer `LoadOrBootstrap`**, which does both safely.
 
 ### `LoadOrBootstrap(path string) (string, error)`
 
@@ -265,11 +250,6 @@ type PublicSecretEntry struct {
     TimesPulled  int       `json:"times_pulled"` // how many times it has been read
     DateAdded    time.Time `json:"created_at"`
     LastModified time.Time `json:"updated_at"`
-}
-
-// Bootstrap response payload. Exported, but you normally use Bootstrap()'s string return.
-type SecretValue struct {
-    Secret string `json:"secret"`
 }
 
 // Returned when Cove answers with an unexpected status. See §6.

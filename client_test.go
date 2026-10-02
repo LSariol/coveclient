@@ -330,41 +330,6 @@ func TestDeleteSecret_Non200(t *testing.T) {
 	}
 }
 
-func TestBootstrap_Success(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Fatalf("method = %s, want GET", r.Method)
-		}
-		if r.URL.Path != "/v0/bootstrap/lighthouse" {
-			t.Fatalf("path = %s, want /v0/bootstrap/lighthouse", r.URL.Path)
-		}
-		io.WriteString(w, envelope(map[string]interface{}{"secret": "beacon"}))
-	}))
-	defer ts.Close()
-
-	c := newTestClient(ts, "tok")
-	got, err := c.Bootstrap()
-	if err != nil {
-		t.Fatalf("Bootstrap error: %v", err)
-	}
-	if got != "beacon" {
-		t.Fatalf("Bootstrap = %q, want beacon", got)
-	}
-}
-
-func TestBootstrap_Non200(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-	}))
-	defer ts.Close()
-
-	c := newTestClient(ts, "tok")
-	_, err := c.Bootstrap()
-	if err == nil || !strings.Contains(err.Error(), "Unexpected Status 403") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestHealth_Success(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {

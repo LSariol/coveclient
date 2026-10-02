@@ -61,15 +61,6 @@ func TestSentinelErrors(t *testing.T) {
 	}
 }
 
-func TestBootstrapRefusalIsErrBootstrapClosed(t *testing.T) {
-	ts := coveError(http.StatusForbidden, "bootstrap_locked", "the bootstrap endpoint is closed")
-	defer ts.Close()
-
-	if _, err := New(ts.URL, "", "test").Bootstrap(); !errors.Is(err, ErrBootstrapClosed) {
-		t.Fatalf("err = %v, want ErrBootstrapClosed", err)
-	}
-}
-
 // A body that isn't Cove's JSON (e.g. an HTML page from a proxy) still gives
 // the plain "Unexpected Status N" error.
 func TestErrorWithoutCoveBody(t *testing.T) {

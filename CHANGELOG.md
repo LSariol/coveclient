@@ -4,7 +4,7 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 
 ## v1.0.0
 
-**No code changes are needed to upgrade from v0.2.0.** What behaves differently is listed first; see [DOCUMENTATION.md](DOCUMENTATION.md#upgrading-from-v020).
+**One code change may be needed to upgrade from v0.2.0:** `Bootstrap()` is gone (see Removed). What behaves differently is listed first; see [DOCUMENTATION.md](DOCUMENTATION.md#upgrading-from-v020).
 
 ### Behaviour changes
 
@@ -22,6 +22,10 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 - `LoadOrBootstrap(path)`: onboarding in one call (reads a saved token, or fetches and saves it safely).
 - `WaitForReady(ctx)`: waits until Cove and its database are up.
 - `ValidateKey`, `WithTimeout`, `WithHTTPClient`, doc comments, examples, and CI on Go 1.21 and the latest Go.
+
+### Removed
+
+- `Bootstrap()` and the `SecretValue` type. Use `LoadOrBootstrap(path)`, which also saves the token and sets it on the client.
 
 ### Works with
 

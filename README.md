@@ -95,13 +95,6 @@ Waits until Cove and its database are up, retrying until `ctx` is done.
 err := c.WaitForReady(ctx)
 ```
 
-### `Bootstrap() (string, error)`
-Unauthenticated. Returns the `COVE_CLIENT_SECRET` while Cove's bootstrap endpoint is open (`bootstrap open` in the Cove CLI). Doesn't save it; prefer `LoadOrBootstrap`.
-
-```go
-secret, err := c.Bootstrap()
-```
-
 ### `GetSecret(key string) (string, error)`
 Returns the decrypted value of a secret by key.
 
@@ -204,4 +197,4 @@ type PublicSecretEntry struct {
 
 - All routes target the Cove `/v0/` API. If Cove upgrades to `/v1/`, update to a matching version of this module.
 - The client uses its own `http.Client`, not `http.DefaultClient`: requests time out after 15 seconds, and redirects aren't followed. Settings made on `http.DefaultClient` don't apply; use `WithHTTPClient` instead.
-- The `Bootstrap` endpoint is one-use only by design. See the [Cove docs](https://github.com/LSariol/cove) for the bootstrap flow.
+- Cove's bootstrap endpoint is one-use only by design. See the [Cove docs](https://github.com/LSariol/cove) for the bootstrap flow.

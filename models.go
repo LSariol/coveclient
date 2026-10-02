@@ -15,8 +15,8 @@ type PublicSecretEntry struct {
 	LastModified time.Time `json:"updated_at"`
 }
 
-// SecretValue is the token returned by Cove's bootstrap endpoint.
-type SecretValue struct {
+// bootstrapPayload is the token returned by Cove's bootstrap endpoint.
+type bootstrapPayload struct {
 	Secret string `json:"secret"`
 }
 

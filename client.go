@@ -305,27 +305,6 @@ func (c *Client) DeleteSecretContext(ctx context.Context, key string) error {
 	}, nil)
 }
 
-// Bootstrap fetches the client token from Cove's bootstrap endpoint. Most
-// programs should call LoadOrBootstrap instead, which also saves the token.
-// It is BootstrapContext with context.Background().
-func (c *Client) Bootstrap() (string, error) {
-	return c.BootstrapContext(context.Background())
-}
-
-// BootstrapContext fetches the client token from Cove's bootstrap endpoint.
-// If Cove refuses, the error matches ErrBootstrapClosed.
-func (c *Client) BootstrapContext(ctx context.Context) (string, error) {
-	var data SecretValue
-	err := c.do(ctx, request{
-		name: "Bootstrap", method: http.MethodGet, path: "/v0/bootstrap/lighthouse",
-		want: http.StatusOK,
-	}, &data)
-	if err != nil {
-		return "", err
-	}
-	return data.Secret, nil
-}
-
 // Health reports whether Cove is running. It is HealthContext with
 // context.Background().
 func (c *Client) Health() (bool, error) {

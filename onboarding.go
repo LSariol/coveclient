@@ -84,7 +84,7 @@ func (c *Client) fetchBootstrapToken() (string, error) {
 		return "", fmt.Errorf("coveClient: Bootstrap: Unexpected Status %d", resp.StatusCode)
 	}
 
-	var data SecretValue
+	var data bootstrapPayload
 	if err := json.Unmarshal(env.Data, &data); err != nil {
 		return "", err
 	}
