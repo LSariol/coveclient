@@ -125,7 +125,7 @@ Every method except `LoadOrBootstrap` and `WaitForReady` has a `...Context` vers
 | `Health()` | `GET /v0/health` | – | – | 200 | `(bool, error)` |
 | `Auth()` | `GET /v0/auth` | ✓ | – | 200 | `error` |
 | `GetSecret(key)` | `GET /v0/secrets/{key}` | ✓ | ✓ | 200 | `(string, error)` |
-| `GetSecrets(keys...)` | `POST /v0/batch` (up to 100 keys per request; one `GET` per key on an older Cove) | ✓ | ✓ | 200 | `(map[string]string, error)` |
+| `GetSecrets(keys...)` | `POST /v0/batch` (up to 100 keys per request) | ✓ | ✓ | 200 | `(map[string]string, error)` |
 | `GetAllSecrets()` | `GET /v0/secrets` | ✓ | – | 200 | `([]PublicSecretEntry, error)` |
 | `AddSecret(key, value)` | `POST /v0/secrets/{key}` | ✓ | ✓ | **201** | `(string, error)` |
 | `UpdateSecret(key, value)` | `PATCH /v0/secrets/{key}` | ✓ | ✓ | 200 | `error` |
@@ -206,7 +206,7 @@ if err != nil {
 dbURL := s["MYAPP_DATABASE_URL"]
 ```
 
-- **One request** for all of them (`POST /v0/batch`). More than 100 keys are split into several requests. On a Cove without the batch endpoint, it falls back to one `GetSecret` per key.
+- **One request** for all of them (`POST /v0/batch`). More than 100 keys are split into several requests.
 - **All or nothing.** If any are missing, the error names **all** of them and matches `ErrNotFound`, so one start-up tells you everything to add. If the token can't read one of them, the error matches `ErrForbidden`; Cove deliberately doesn't say which one (its server log does).
 - Every key is checked with `ValidateKey` before any request.
 - Each key still counts as a read in Cove.

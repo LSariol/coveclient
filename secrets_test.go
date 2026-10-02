@@ -12,13 +12,12 @@ import (
 	"testing"
 )
 
-// batchCove serves values like Cove 1.0: single reads and POST /v0/batch
-// (all or nothing, missing keys listed in error.keys). forbidden keys are
-// refused like a project token that can't read them. It counts requests.
+// batchCove serves POST /v0/batch like Cove: all or nothing, missing keys
+// listed in error.keys. forbidden keys are refused like a project token that
+// can't read them. It counts requests.
 type batchCove struct {
 	values    map[string]string
 	forbidden map[string]bool
-	oldCove   bool // no batch endpoint, like Cove before 1.0
 	requests  int
 	batches   [][]string
 }
@@ -26,7 +25,7 @@ type batchCove struct {
 func (f *batchCove) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.requests++
 	switch {
-	case r.URL.Path == "/v0/batch" && !f.oldCove:
+	case r.URL.Path == "/v0/batch":
 		var body struct{ Keys []string }
 		json.NewDecoder(r.Body).Decode(&body)
 		f.batches = append(f.batches, body.Keys)
@@ -55,16 +54,6 @@ func (f *batchCove) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		io.WriteString(w, envelope(map[string]any{"secrets": found}))
 
-	case strings.HasPrefix(r.URL.Path, "/v0/secrets/"):
-		key := strings.TrimPrefix(r.URL.Path, "/v0/secrets/")
-		value, ok := f.values[key]
-		if !ok {
-			w.WriteHeader(http.StatusNotFound)
-			io.WriteString(w, `{"success":false,"error":{"type":"not_found","message":"secret not found"}}`)
-			return
-		}
-		io.WriteString(w, envelope(map[string]any{"key": key, "value": value, "version": 1}))
-
 	default: // like Go's ServeMux for an unknown route: plain text
 		http.NotFound(w, r)
 	}
@@ -92,15 +81,13 @@ func TestGetSecretsUsesOneRequest(t *testing.T) {
 }
 
 func TestGetSecretsNamesEveryMissingKey(t *testing.T) {
-	for _, old := range []bool{false, true} {
-		f := &batchCove{values: map[string]string{"a": "1"}, oldCove: old}
-		got, err := startFake(t, f).GetSecrets("a", "b", "c")
-		if !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "b, c") {
-			t.Fatalf("old Cove %v: err = %v, want ErrNotFound naming b and c", old, err)
-		}
-		if got != nil {
-			t.Fatalf("old Cove %v: got values %v alongside an error", old, got)
-		}
+	f := &batchCove{values: map[string]string{"a": "1"}}
+	got, err := startFake(t, f).GetSecrets("a", "b", "c")
+	if !errors.Is(err, ErrNotFound) || !strings.Contains(err.Error(), "b, c") {
+		t.Fatalf("err = %v, want ErrNotFound naming b and c", err)
+	}
+	if got != nil {
+		t.Fatalf("got values %v alongside an error", got)
 	}
 }
 
@@ -109,17 +96,6 @@ func TestGetSecretsForbidden(t *testing.T) {
 	_, err := startFake(t, f).GetSecrets("a", "b")
 	if !errors.Is(err, ErrForbidden) {
 		t.Fatalf("err = %v, want ErrForbidden", err)
-	}
-}
-
-func TestGetSecretsFallsBackOnAnOlderCove(t *testing.T) {
-	f := &batchCove{values: map[string]string{"a": "1", "b": "2"}, oldCove: true}
-	got, err := startFake(t, f).GetSecrets("a", "b")
-	if err != nil || got["a"] != "1" || got["b"] != "2" {
-		t.Fatalf("GetSecrets on an old Cove = %v, %v", got, err)
-	}
-	if f.requests != 3 { // the batch attempt, then one per key
-		t.Errorf("%d requests, want 3", f.requests)
 	}
 }
 

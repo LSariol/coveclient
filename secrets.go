@@ -20,7 +20,7 @@ func (c *Client) GetSecrets(keys ...string) (map[string]string, error) {
 
 // GetSecretsContext returns the values of several secrets, keyed by name, in
 // one request (Cove's POST /v0/batch; up to 100 keys per request, more are
-// split). On a Cove without that endpoint it asks for each key in turn.
+// split).
 //
 // If any are missing, it returns an error naming all of them, not just the
 // first, so one start-up tells you everything to add. That error matches
@@ -41,9 +41,6 @@ func (c *Client) GetSecretsContext(ctx context.Context, keys ...string) (map[str
 		chunk := keys[start:min(start+maxBatchKeys, len(keys))]
 
 		got, err := c.batch(ctx, chunk)
-		if errors.Is(err, errNoBatch) {
-			return c.getEach(ctx, keys)
-		}
 		var m *missingKeysError
 		if errors.As(err, &m) {
 			missing = append(missing, m.keys...)
@@ -65,9 +62,6 @@ func (c *Client) GetSecretsContext(ctx context.Context, keys ...string) (map[str
 
 // maxBatchKeys is the most keys Cove accepts in one batch request.
 const maxBatchKeys = 100
-
-// errNoBatch means the Cove server predates POST /v0/batch.
-var errNoBatch = errors.New("coveClient: this Cove has no batch endpoint")
 
 type missingKeysError struct{ keys []string }
 
@@ -94,13 +88,8 @@ func (c *Client) batch(ctx context.Context, keys []string) (map[string]string, e
 	}, &data)
 
 	var apiErr *APIError
-	if errors.As(err, &apiErr) {
-		switch {
-		case apiErr.Type == "" && (apiErr.StatusCode == http.StatusNotFound || apiErr.StatusCode == http.StatusMethodNotAllowed):
-			return nil, errNoBatch // not Cove's JSON: the route doesn't exist
-		case apiErr.StatusCode == http.StatusNotFound && len(apiErr.Keys) > 0:
-			return nil, &missingKeysError{keys: apiErr.Keys}
-		}
+	if errors.As(err, &apiErr) && apiErr.StatusCode == http.StatusNotFound && len(apiErr.Keys) > 0 {
+		return nil, &missingKeysError{keys: apiErr.Keys}
 	}
 	if err != nil {
 		return nil, err
@@ -118,28 +107,6 @@ func (c *Client) batch(ctx context.Context, keys []string) (map[string]string, e
 		if _, ok := values[k]; !ok {
 			return nil, fmt.Errorf("coveClient: GetSecrets: Cove didn't return %q", k)
 		}
-	}
-	return values, nil
-}
-
-// getEach reads keys one request at a time, for a Cove without the batch
-// endpoint.
-func (c *Client) getEach(ctx context.Context, keys []string) (map[string]string, error) {
-	values := make(map[string]string, len(keys))
-	var missing []string
-	for _, key := range keys {
-		value, err := c.GetSecretContext(ctx, key)
-		if errors.Is(err, ErrNotFound) {
-			missing = append(missing, key)
-			continue
-		}
-		if err != nil {
-			return nil, err
-		}
-		values[key] = value
-	}
-	if len(missing) > 0 {
-		return nil, missingError(missing)
 	}
 	return values, nil
 }

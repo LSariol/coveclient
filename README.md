@@ -103,7 +103,7 @@ value, err := c.GetSecret("my-api-key")
 ```
 
 ### `GetSecrets(keys ...string) (map[string]string, error)`
-Returns several secrets, keyed by name, in **one request** (Cove's `POST /v0/batch`; an older Cove gets one request per key). All or nothing: if any are missing, the error names all of them and matches `ErrNotFound`; if the token can't read one, it matches `ErrForbidden` (Cove doesn't say which; its server log does).
+Returns several secrets, keyed by name, in **one request** (Cove's `POST /v0/batch`). All or nothing: if any are missing, the error names all of them and matches `ErrNotFound`; if the token can't read one, it matches `ErrForbidden` (Cove doesn't say which; its server log does).
 
 ```go
 s, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")

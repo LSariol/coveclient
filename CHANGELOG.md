@@ -18,7 +18,7 @@ All notable changes to CoveClient. Versions follow [semantic versioning](https:/
 
 - `APIError` and sentinel errors for `errors.Is`: `ErrNotFound`, `ErrUnauthorized`, `ErrForbidden`, `ErrAlreadyExists`, `ErrInvalidKey`, `ErrBootstrapClosed`.
 - `...Context` versions of every method.
-- `GetSecrets(keys...)`: several secrets in one request (Cove's `POST /v0/batch`), naming every missing key; falls back to one request per key on an older Cove.
+- `GetSecrets(keys...)`: several secrets in one request (Cove's `POST /v0/batch`), naming every missing key.
 - `LoadOrBootstrap(path)`: onboarding in one call (reads a saved token, or fetches and saves it safely).
 - `WaitForReady(ctx)`: waits until Cove and its database are up.
 - `ValidateKey`, `WithTimeout`, `WithHTTPClient`, doc comments, examples, and CI on Go 1.21 and the latest Go.
