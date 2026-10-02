@@ -140,23 +140,6 @@ func TestWaitForReady(t *testing.T) {
 	}
 }
 
-func TestWaitForReadyFallsBackToHealthOnOlderCove(t *testing.T) {
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/v0/ready" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		io.WriteString(w, envelope(map[string]bool{"healthy": true}))
-	}))
-	defer ts.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := New(ts.URL, "", "test").WaitForReady(ctx); err != nil {
-		t.Fatal(err)
-	}
-}
-
 func TestWaitForReadyGivesUp(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusServiceUnavailable)

@@ -132,8 +132,7 @@ func writeTokenFile(path string, token string) error {
 
 // WaitForReady waits until Cove is up and can serve secrets, checking with a
 // growing delay (up to 5 seconds) until ctx is done. It uses /v0/ready, which
-// also checks Cove's database, and falls back to /v0/health for Cove versions
-// that don't have it.
+// also checks Cove's database.
 //
 //	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 //	defer cancel()
@@ -155,11 +154,7 @@ func (c *Client) WaitForReady(ctx context.Context) error {
 }
 
 func (c *Client) isReady(ctx context.Context) bool {
-	status := c.checkStatus(ctx, "/v0/ready")
-	if status == http.StatusNotFound {
-		status = c.checkStatus(ctx, "/v0/health") // Cove before v1.0.0
-	}
-	return status == http.StatusOK
+	return c.checkStatus(ctx, "/v0/ready") == http.StatusOK
 }
 
 // checkStatus returns the HTTP status of GET path, or 0 if the request failed.

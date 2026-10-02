@@ -131,7 +131,7 @@ Every method except `LoadOrBootstrap` and `WaitForReady` has a `...Context` vers
 | `UpdateSecret(key, value)` | `PATCH /v0/secrets/{key}` | ✓ | ✓ | 200 | `error` |
 | `DeleteSecret(key)` | `DELETE /v0/secrets/{key}` | ✓ | ✓ | 200 | `error` |
 | `LoadOrBootstrap(path)` | reads `path`, or `GET /v0/bootstrap/lighthouse` then `GET /v0/auth` | – | – | 200 | `(string, error)` |
-| `WaitForReady(ctx)` | `GET /v0/ready` (falls back to `/v0/health`), repeated | – | – | 200 | `error` |
+| `WaitForReady(ctx)` | `GET /v0/ready`, repeated | – | – | 200 | `error` |
 
 ### `Health() (bool, error)`
 
@@ -181,7 +181,7 @@ if err := c.WaitForReady(ctx); err != nil {
 }
 ```
 
-It uses `/v0/ready`, and falls back to `/v0/health` for Cove versions older than 1.0.0.
+It uses `/v0/ready`, which also checks Cove's database.
 
 ### `GetSecret(key string) (string, error)`
 
@@ -419,7 +419,7 @@ do(ctx, request, &out)
 
 Redirects aren't followed because Cove never redirects on purpose, and following one would turn a POST, PATCH or DELETE into a GET.
 
-`LoadOrBootstrap` and `WaitForReady` (in `onboarding.go`) make their own requests with `c.httpClient()`, because they handle statuses differently (a refused bootstrap, or a `404` from `/v0/ready` on old Cove).
+`LoadOrBootstrap` and `WaitForReady` (in `onboarding.go`) make their own requests with `c.httpClient()`, because they handle statuses differently (a refused bootstrap, or Cove not being ready yet).
 
 To add a method: write a `...Context` version that calls `c.do`, and a plain version that calls it with `context.Background()`. Keep the `coveClient: <Method>:` error prefix and don't add external dependencies.
 
