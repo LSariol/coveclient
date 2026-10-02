@@ -14,9 +14,9 @@
 // ErrForbidden, ErrAlreadyExists, ErrInvalidKey or ErrBootstrapClosed with
 // errors.Is.
 //
-// The token can be Cove's master token or a project token (`token create` in
-// the Cove CLI), which only reaches the keys it was given; the client works
-// the same with either.
+// The token is a project token (`token create` in the Cove CLI), which only
+// reaches the keys it was given. Cove records what the client does under the
+// token's name.
 //
 // Requests time out after DefaultTimeout (15 seconds); change it with
 // WithTimeout, or supply your own http.Client with WithHTTPClient.

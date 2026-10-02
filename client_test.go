@@ -29,7 +29,7 @@ func TestNewClient(t *testing.T) {
 	if c == nil {
 		t.Fatalf("New returned nil")
 	}
-	if c.BaseURL != "http://example" || c.ClientSecret != "tok" {
+	if c.BaseURL != "http://example" || c.Token != "tok" {
 		t.Fatalf("unexpected client fields: %+v", c)
 	}
 }
@@ -94,7 +94,7 @@ func TestGetSecret_BadJSON(t *testing.T) {
 }
 
 func TestGetSecret_RequestBuildError(t *testing.T) {
-	c := &Client{BaseURL: "http://%", ClientSecret: "tok"}
+	c := &Client{BaseURL: "http://%", Token: "tok"}
 	_, err := c.GetSecret("id")
 	if err == nil {
 		t.Fatalf("expected request build error")

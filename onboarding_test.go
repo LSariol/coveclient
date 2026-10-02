@@ -60,8 +60,8 @@ func TestLoadOrBootstrapFetchesSavesAndReuses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if token != cove.token || c.ClientSecret != cove.token {
-		t.Fatalf("token = %q, ClientSecret = %q", token, c.ClientSecret)
+	if token != cove.token || c.Token != cove.token {
+		t.Fatalf("token = %q, Token = %q", token, c.Token)
 	}
 
 	saved, err := os.ReadFile(path)

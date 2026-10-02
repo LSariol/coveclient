@@ -39,7 +39,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if c.ClientSecret == "" {
+	if c.Token == "" {
 		tokenFile := os.Getenv("COVE_TOKEN_FILE")
 		if tokenFile == "" {
 			tokenFile = "cove.token"

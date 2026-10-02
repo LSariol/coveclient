@@ -18,8 +18,8 @@ const DefaultTimeout = 15 * time.Second
 // Client talks to one Cove server. Create it with New. A Client is safe to use
 // from several goroutines, as long as its fields aren't changed meanwhile.
 type Client struct {
-	BaseURL      string // e.g. "http://cove:2100"
-	ClientSecret string // the token sent as "Authorization: Bearer ..."
+	BaseURL string // e.g. "http://cove:2100"
+	Token   string // the token sent as "Authorization: Bearer ..."
 
 	hc      *http.Client
 	timeout time.Duration
@@ -40,15 +40,15 @@ func WithHTTPClient(hc *http.Client) Option {
 	return func(c *Client) { c.hc = hc }
 }
 
-// New returns a Client for the Cove server at baseURL. clientSecret is your
+// New returns a Client for the Cove server at baseURL. token is your
 // project's token (created with `token create` in the Cove CLI); Cove records
 // everything the client does under that token's name. Pass "" if the token
 // will come from LoadOrBootstrap.
-func New(baseURL string, clientSecret string, opts ...Option) *Client {
+func New(baseURL string, token string, opts ...Option) *Client {
 	c := &Client{
-		BaseURL:      baseURL,
-		ClientSecret: clientSecret,
-		timeout:      DefaultTimeout,
+		BaseURL: baseURL,
+		Token:   token,
+		timeout: DefaultTimeout,
 	}
 
 	for _, opt := range opts {
@@ -119,7 +119,7 @@ func (c *Client) do(ctx context.Context, r request, out any) error {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	if r.auth {
-		req.Header.Set("Authorization", "Bearer "+c.ClientSecret)
+		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
 	resp, err := c.httpClient().Do(req)

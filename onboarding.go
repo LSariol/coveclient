@@ -18,7 +18,7 @@ import (
 // address isn't allowed. Run `bootstrap open` in the Cove CLI, then retry.
 var ErrBootstrapClosed = errors.New("coveClient: Cove's bootstrap endpoint refused the request")
 
-// LoadOrBootstrap gets this client's token and sets it as c.ClientSecret.
+// LoadOrBootstrap gets this client's token and sets it as c.Token.
 //
 // If the file at path exists, the token is read from it and no request is
 // made. Otherwise the token is fetched from Cove's bootstrap endpoint, saved to
@@ -34,7 +34,7 @@ func (c *Client) LoadOrBootstrap(path string) (string, error) {
 		if token == "" {
 			return "", fmt.Errorf("coveClient: token file %s is empty; delete it to bootstrap again", path)
 		}
-		c.ClientSecret = token
+		c.Token = token
 		return token, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
@@ -49,7 +49,7 @@ func (c *Client) LoadOrBootstrap(path string) (string, error) {
 	if err := writeTokenFile(path, token); err != nil {
 		return "", err
 	}
-	c.ClientSecret = token
+	c.Token = token
 
 	if err := c.Auth(); err != nil {
 		return "", fmt.Errorf("coveClient: the bootstrapped token was saved to %s but didn't authenticate: %w", path, err)
