@@ -90,7 +90,6 @@ func (c *Client) url(path string) string {
 	return strings.TrimRight(c.BaseURL, "/") + path
 }
 
-// request describes one API call.
 type request struct {
 	name   string // the Client method, for error messages
 	method string
@@ -152,8 +151,7 @@ func decodeEnvelope(resp *http.Response, out interface{}) error {
 	return nil
 }
 
-// GetSecret returns the value of the secret named key. It is
-// GetSecretContext with context.Background().
+// GetSecret is GetSecretContext with context.Background().
 func (c *Client) GetSecret(key string) (string, error) {
 	return c.GetSecretContext(context.Background(), key)
 }
@@ -186,13 +184,13 @@ func (c *Client) GetSecretContext(ctx context.Context, key string) (string, erro
 	return data.Value, nil
 }
 
-// GetAllSecrets lists every secret's key and details, without values. It is
-// GetAllSecretsContext with context.Background().
+// GetAllSecrets is GetAllSecretsContext with context.Background().
 func (c *Client) GetAllSecrets() ([]PublicSecretEntry, error) {
 	return c.GetAllSecretsContext(context.Background())
 }
 
-// GetAllSecretsContext lists every secret's key and details, without values.
+// GetAllSecretsContext lists every secret the token can read, with its
+// details but without its value.
 func (c *Client) GetAllSecretsContext(ctx context.Context) ([]PublicSecretEntry, error) {
 	var data struct {
 		Secrets []PublicSecretEntry `json:"secrets"`
@@ -207,8 +205,7 @@ func (c *Client) GetAllSecretsContext(ctx context.Context) ([]PublicSecretEntry,
 	return data.Secrets, nil
 }
 
-// AddSecret creates a secret and returns Cove's confirmation message. It is
-// AddSecretContext with context.Background().
+// AddSecret is AddSecretContext with context.Background().
 func (c *Client) AddSecret(key string, value string) (string, error) {
 	return c.AddSecretContext(context.Background(), key, value)
 }
@@ -237,8 +234,7 @@ func (c *Client) AddSecretContext(ctx context.Context, key string, value string)
 	return data.Message, nil
 }
 
-// UpdateSecret changes an existing secret's value. It is UpdateSecretContext
-// with context.Background().
+// UpdateSecret is UpdateSecretContext with context.Background().
 func (c *Client) UpdateSecret(key string, value string) error {
 	return c.UpdateSecretContext(context.Background(), key, value)
 }
@@ -257,8 +253,7 @@ func (c *Client) UpdateSecretContext(ctx context.Context, key string, value stri
 	}, nil)
 }
 
-// DeleteSecret deletes a secret. It is DeleteSecretContext with
-// context.Background().
+// DeleteSecret is DeleteSecretContext with context.Background().
 func (c *Client) DeleteSecret(key string) error {
 	return c.DeleteSecretContext(context.Background(), key)
 }
@@ -278,8 +273,7 @@ func (c *Client) DeleteSecretContext(ctx context.Context, key string) error {
 	}, nil)
 }
 
-// Health reports whether Cove is running. It is HealthContext with
-// context.Background().
+// Health is HealthContext with context.Background().
 func (c *Client) Health() (bool, error) {
 	return c.HealthContext(context.Background())
 }
@@ -301,8 +295,7 @@ func (c *Client) HealthContext(ctx context.Context) (bool, error) {
 	return data.Healthy, nil
 }
 
-// Auth checks that the client's token is accepted. It is AuthContext with
-// context.Background().
+// Auth is AuthContext with context.Background().
 func (c *Client) Auth() error {
 	return c.AuthContext(context.Background())
 }

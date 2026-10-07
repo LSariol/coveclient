@@ -10,7 +10,6 @@ import (
 // sent. Check for it with errors.Is.
 var ErrInvalidKey = errors.New("invalid key")
 
-// maxKeyLength is the longest key Cove accepts.
 const maxKeyLength = 256
 
 // ValidateKey reports whether key is a valid Cove secret key: 1 to 256

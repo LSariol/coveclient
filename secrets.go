@@ -8,8 +8,7 @@ import (
 	"strings"
 )
 
-// GetSecrets returns the values of several secrets, keyed by name. It is
-// GetSecretsContext with context.Background().
+// GetSecrets is GetSecretsContext with context.Background().
 //
 //	s, err := c.GetSecrets("MYAPP_DATABASE_URL", "MYAPP_TMDB_API_KEY")
 //	if err != nil { log.Fatal(err) }
@@ -60,7 +59,6 @@ func (c *Client) GetSecretsContext(ctx context.Context, keys ...string) (map[str
 	return values, nil
 }
 
-// maxBatchKeys is the most keys Cove accepts in one batch request.
 const maxBatchKeys = 100
 
 type missingKeysError struct{ keys []string }
